@@ -1,0 +1,584 @@
+---
+title: 'Ingresos de remesas'
+subtitle: 'Proyecto para la clase Series de Tiempo de la maestría ciencia de datos'
+author: 'Alumno: Daniel Nuño, daniel.nuno@iteso.mx'
+date: "Mayo 16, 2022"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+---
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6, fig.width = 7)
+```
+
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+
+<center>
+![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg){width=20%}
+</center>
+
+# Remesas
+
+Las remesas son la segunda fuente de divisas más importante de México después de los ingresos por petróleo. Representan cerca de 3% del PIB, 50% de las exportaciones petroleras, 135% de la inversión extranjera directa y 189% de los ingresos de viajeros internacionales.
+
+Los ingresos por remesas provenientes del exterior ascendieron a 4,760 millones de dólares en diciembre de 2021, lo que implicó un aumento anual de 30.4%.
+
+Por su parte, las remesas enviadas por residentes en México al exterior mostraron un crecimiento anual de 1.8%, al alcanzar un nivel de 114 millones de dólares.
+
+Con estos resultados, el superávit de la cuenta de remesas de México con el resto del mundo fue de 4,646 millones de dólares, mayor al de 3,538 millones de dólares que se presentó en diciembre de 2020.
+
+Con series desestacionalizadas, en el último mes de 2021 los ingresos y egresos por remesas exhibieron retrocesos mensuales de 1.9 y 2.3%, en igual orden. Así, en diciembre de 2021 el superávit de la cuenta de remesas se situó en 4,600 millones de dólares, que se compara con el de 4,687 millones de dólares que se observó en noviembre de 2021.
+
+Para la totalidad de 2021, el valor de los ingresos por remesas fue de 51,594 millones de dólares, monto superior al de 40,605 millones de dólares reportado en 2020 y que significó una expansión anual de 27.1%.
+
+Durante 2021, el 98.9% del total de los ingresos por remesas se realizó a través de transferencias electrónicas, al ubicarse en 51,045 millones de dólares. Por su parte, las remesas efectuadas en efectivo y especie2 y las money orders representaron el 0.7 y 0.4% del monto total, respectivamente, al registrar niveles de 333 y 216 millones de dólares, en el mismo orden.
+
+Los egresos por remesas sumaron 1,057 millones de dólares en 2021, cifra mayor a la de 899 millones de dólares observada en 2020 y que implicó un incremento anual de 17.6%.
+
+Con estos resultados, el saldo superavitario de la cuenta de remesas en 2021 fue de 50,537 millones de dólares, cifra superior a la de 39,706 millones de dólares reportada en 2020 y que representó un avance anual de 27.3%.
+
+Banco de México registra las remesas como parte de la balanza de pagos y tiene registro mensual desde 1995.
+
+Los datos de banxico pueden ser descargados en el siguiente [enlace](https://www.banxico.org.mx/SieInternet/consultarDirectorioInternetAction.do?accion=consultarCuadro&idCuadro=CE81&locale=es).
+
+## Carga de datos
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# For manipulating data
+library(tidyverse)
+library(fpp3)
+library(patchwork)
+library(tidyquant)
+library(fable)
+library(feasts)
+library(tsibble)
+library(fpp2)
+library(readr)
+library(EnvStats)
+
+library(forcats)
+library(lubridate)
+
+# For descriptive statistics and graphing
+library(skimr)
+library(ggplot2)
+library(scales)
+library(ggExtra)
+```
+
+```{r}
+# raw data manipulation
+raw_data <- read_csv("remesas_banxico.csv", col_names = FALSE, skip = 10, show_col_types = FALSE)
+
+sub_column_names <- raw_data[5,2:length(raw_data)] %>% 
+    str_replace_all("�", "o") %>% 
+    str_replace_all("\\s+", "_")
+column_names <- raw_data[1,2:length(raw_data)] %>%
+    str_replace_all("�", "o") %>% 
+    str_replace_all("\\s+", "_") %>% 
+    paste(sub_column_names)
+
+remesas_dates <- as.Date(raw_data$X1[10:length(raw_data$X1)], '%d/%m/%Y')
+raw_data <- slice(raw_data[-c(1)], 10:n())
+raw_data <- as_tibble(lapply(raw_data, as.numeric))
+raw_data$dates <- yearmonth(remesas_dates)
+colnames(raw_data) <- c(column_names, 'dates')
+
+data <- select(raw_data, 'Remesas_Familiares,_Total Millones_de_Dolares', 'dates')
+data <- as_tsibble(raw_data, index=dates)
+
+totals_columns <- c('Remesas_Familiares,_Total Millones_de_Dolares',
+                    'Remesas_Familiares,_Total Miles_de_Operaciones',
+                    'Remesas_Familiares,_Promedio_Total Dolares')
+totals_columns <- c('Remesas_Familiares,_Total Millones_de_Dolares')
+
+# final time series
+data <- select(data, 'Remesas_Familiares,_Total Millones_de_Dolares')
+data <- data %>% rename('remesas' = 'Remesas_Familiares,_Total Millones_de_Dolares')
+```
+
+
+```{r}
+print(paste('fecha inicial', min(data$dates)))
+print(paste('fecha final', max(data$dates)))
+print(paste('observaciones', nrow(data)))
+print(paste('existen', sum(is.na(data)), 'datos faltantes'))
+```
+
+Los datos presentan 5 columnas para los valores totales de las remesas enviadas en millones de dólares segregados la forma que fueron enviadas:
+- Total
+- Money Orders
+- Cheques Personales
+- Transferencias Electrónicas
+- Efectivo y Especie
+
+Tenemos también información de la cantidad de operaciones y por lo tanto los promedios de cada transacción. En total son 16 columnas incluyendo el mes y año registrados. Son 327 observaciones hasta Enero 2022 y no contiene datos faltantes.
+
+
+## Análisis descriptivo
+
+```{r}
+summary(data[, 'remesas'])
+```
+
+
+Observamos que, por mes, el promedio de millones de dólares es de \$1734.2 millones de dólares, el mínimo fue de \$248.1 millones de dólares, mientras que el máximo fue de $4822.1 millones.
+En cuanto las transacciones, en promedio de registran 5.3 millones de transacciones y la media del valor de las transacciones es de $321 dólares.
+
+
+```{r}
+data %>%
+    select('remesas') %>% 
+    autoplot() +
+    ggtitle('Remesas por mes') + ylab('Millones de dólares') + xlab('Fecha')
+```
+
+Gráficamente presenta tendencia, estacionalidad y heteroscedasticidad.
+
+La distribución presenta un sesgo de simetría negativo a la izquierda y aunque los valores no son tan grandes, alguna transformación sería útil antes de hacer la descomposición de la serie y los pronósticos ya que también tiene heterocedasticidad.
+
+```{r}
+p <- ggplot(data, aes(x=dates, y=remesas)) +
+    geom_point() + ggtitle('Remesas por mes') + ylab('Millones de dólares') + xlab('Fecha')
+
+ggMarginal(p, type='histogram', margins = 'y')
+    
+```
+
+Es interesante observar con este gráfico que a partir del año 2004 los datos se ven separados, es decir, la amplitud de los datos se vuelve más grande en cada año después que pasa. Podemos concluir tres cosas con esto:
+
+- Los primeros siete u ocho años de la serie hay crecimiento, pero a partir del 2003 el crecimiento es exponencial de cómo era antes.
+- En esas fechas se volvió más fácil hacer transferencias electrónicas y por lo tanto contabilizarlo en la balanza de pagos.
+- El crecimiento puede ser también por la solidaridad de los migrantes.
+
+>En el 2001, en respuesta a la "Sociedad para la prosperidad" entre México y Estados Unidos, el Banco de México y los Bancos de la Reserva Federal de los Estados Unidos acordaron estudiar la posibilidad de interconectar sus sistemas de pagos. La interconexión ha provisto a nuestras economías de un mecanismo eficiente para intercambiar pagos entre cuentas bancarias de ambos países.
+
+>En octubre de 2003, los Bancos de la Reserva Federal de los Estados Unidos y el Banco de México conectaron sus sistemas de pago para el envío de los pagos de los pensionados del Gobierno de los Estados Unidos que radican en México.
+
+>Posteriormente, desde el 2 de febrero de 2004, los usuarios de las instituciones financieras de los Estados Unidos suscritas a Directo a México pueden enviar pagos a cualquier cuenta bancaria en México.
+
+>Desde julio de 2005, este servicio de pagos se registró con el nombre Directo a México
+
+Entonces para considerar como periodos que han afectado la serie de tiempo tenemos:
+
+- 2003-10 facilidad de transferencias electrónicas
+- 2007-12, 2009-06 recesión global por crisis hipotecaria
+- 2020-02, 2020-04 recesión global por COVID-19
+
+La siguiente table muestra el crecimiento año tras año:
+
+
+```{r}
+p <- data %>% as_tibble %>% group_by(years=year(dates)) %>%
+    summarise(remesas=sum(remesas)) %>%
+    arrange(desc(years))%>%
+    mutate(change = (remesas/lead(remesas) - 1) * 100) %>% 
+    filter(years > 1995) %>% 
+    filter(years < 2022)
+
+mean_growth <- data %>% as_tibble %>% group_by(years=year(dates)) %>%
+                    summarise(remesas=sum(remesas)) %>%
+                    arrange(desc(years))%>%
+                    mutate(change = (remesas/lead(remesas) - 1) * 100) %>% 
+                    filter(years > 1995) %>% 
+                    filter(years < 2022) %>%
+                    summarise(mean(change))
+
+mean_growth <- mean_growth$`mean(change)`
+
+ggplot(p, aes(x=years, y=change)) +
+    geom_line() +
+    geom_hline(yintercept=mean_growth) +
+    geom_hline(yintercept=0) +
+    ggtitle('Cambio porcentual por año') + ylab('%') + xlab('Mes')
+```
+
+Y el crecimiento promedio es de `r mean_growth` %.
+
+## Datos atípicos
+El siguiente grafico muestra el boxplot por año. Anteriormente calculamos la distribución en conjunta, entonces es interesante ver el comportamiento anual y con el fin detectar outliers.
+
+
+```{r}
+data %>% group_by(years=year(dates)) %>%
+    ggplot(aes(x=years, y=remesas)) +
+    geom_boxplot(aes(group=years)) +
+    ggtitle('Boxplot remesas por año') + ylab('Remesas') + xlab('Mes')
+```
+
+
+
+```{r}
+ttl_m_dlrs <- data %>% select('remesas')
+ttl_m_dlrs <- as.numeric(unlist(ttl_m_dlrs[,1]))
+summary(ttl_m_dlrs)[2] - 1.5*IQR(ttl_m_dlrs) >= summary(ttl_m_dlrs)[1]
+summary(ttl_m_dlrs)[5] + 1.5*IQR(ttl_m_dlrs) <= summary(ttl_m_dlrs)[6]
+```
+
+Calculando outliers como 1.5 veces el rango intercuartílico por encima y debajo del 1 y 3 cuartil, sí hay valores atípicos.
+
+```{r}
+summary(ttl_m_dlrs)[2] - 3*IQR(ttl_m_dlrs) >= summary(ttl_m_dlrs)[1]
+summary(ttl_m_dlrs)[5] + 3*IQR(ttl_m_dlrs) <= summary(ttl_m_dlrs)[6]
+```
+Calculando valores extremos como 3 veces el rango intercuartílico por encima y debajo del 1 y 3 cuartil no, hay valores extremos.
+
+En ningún caso es necesario quitarlos, pero como ya lo mencioné, en los periodos donde sucede algo importante podemos codificarlos y serán útiles para el análisis de regresión.
+
+- 2003-10 facilidad de transferencias electrónicas
+- 2007-12, 2009-06 recesión global por crisis hipotecaria
+- 2020-02, 2020-04 recesión global por COVID-19
+
+## Transformación box cox
+
+Tan solo con observar las magnitudes de los valores al inicio y final de la serie no le caería mal una transformación de potencias. El histograma también muestra sesgo negativo. Para tener un mejor punto de comparación con la prueba SHAPIRO-WILK (alpha = 0.05) y el sesgo.
+
+```{r}
+skewness(data$remesas)
+shapiro.test(data$remesas)
+```
+```{r}
+op <- par(pty = "s", mfrow = c(1, 2))
+qqnorm(data$remesas)
+qqline(data$remesas)
+```
+Valor p es menor que Alpha entonces no tenemos una distribución normal. De hecho estamos lejos de una distribución normal pero el sesgo no esta tan mal siendo `r skewness(data$remesas)`. Queremos lo más acercado a 0 de sesgo.
+
+Aunque se puede entender y usar la transformación box cox para transformar una distribución no normal a una normal, el principal objetivo es corregir sesgos y varianzas desiguales de la siguiente manera:
+
+$$
+y(\lambda) =\begin{cases}
+    \frac{(y^\lambda - 1)}{\lambda}& \lambda \neq 0 ,\\
+    log(y)&   \lambda = 0.
+    \end{cases}
+$$
+
+El lambda óptimo se encuentra cuando se encuentra la distribución con el máximo loglikelihood o con el coeficiente del gráfico de probabilidad de correlación o Shapiro-Wilk.
+
+El sesgo mejoro a -0.12.
+
+```{r, echo=FALSE}
+bc <- EnvStats::boxcox(data$remesas, lambda=c(-2, 2), optimize=TRUE, objective.name='Log-Likelihood')
+bc_data <- EnvStats::boxcoxTransform(data$remesas, bc$lambda)
+
+skewness(bc_data)
+shapiro.test(bc_data)
+op <- par(pty = "s", mfrow = c(1, 2))
+qqnorm(bc_data)
+qqline(bc_data)
+
+data <- data %>% mutate('remesas_trn' = bc_data)
+
+```
+## Descomposición de la serie de tiempo
+Para estudiar las características de tendencia y estacionalidad se descompone y graficar usando el método STL.
+La función per de *periodicity* es la más adecuada al parámetro de suavización estacional *s.windows*. Es el componente estacional es el más pequeño, siendo la tendencia más significativa.
+
+Podemos observar en el componente estacional captura, que el inicio de año es el más flojito y que, a mediados del año es cuando se envían más remesas.
+
+El competente de tendencia y remanentes observamos y confirmamos lo mencionado anteriormente. A partir del 2004 el envío de remesas, o el registro, aumenta considerablemente y el en 2008 y 2020 el remanente es muy significativo. También, a partir del 2020 el componente remanente se acentúa.
+
+```{r}
+stl_model <- data %>% dplyr::select(remesas_trn) %>% stl(s.window = 'per')
+plot(stl_model,main = 'Descomposicón de la serie con STL')
+
+```
+
+
+## Definición de entrenamiento y prueba
+
+Para una evaluación entre modelos voy a usar los últimos 6 meses.
+
+```{r}
+train <- data %>% select(remesas_trn) %>% filter_index("1995 Jan" ~ "2021 Sep")
+test <- data %>% select(remesas_trn) %>% filter_index("2021 Oct" ~ "2022 Mar")
+tstng_prds <- 6
+frcst_prds <- 6
+```
+
+## Seasonal Naive
+
+```{r}
+models_fit <- train %>% 
+    model(`Seasonal naive` = SNAIVE(remesas_trn))
+models_tst <- models_fit %>% forecast(h = tstng_prds)
+mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
+models_tst %>% autoplot(filter_index(data, "1995 Jan" ~ .)) +
+    ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes') +
+    annotate("label", x = c(as.Date("2003-01-01")),
+           y = 150, label = c(paste('MAPE', (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE)),
+           color = c("black"))
+
+```
+
+```{r, message=FALSE}
+data %>% 
+  model(SNAIVE(remesas_trn)) %>% 
+  gg_tsresiduals() +
+    ggtitle("Diagnóstico de residuales para el modelo de Seasonal Naive")
+
+```
+Los residuales de este prime modelos parecen ser normalmente distribuidos con algunos atípicos. También parece ser una serie muy auto correlacionada con rezagos representativos hasta el periodo 25.
+
+## STL y ETS
+
+El siguiente modelo para probar es con la descomposición STL y suavización exponencial como estimador.
+
+```{r, message=FALSE}
+stl_ets_model_fit <- stl(train, s.window = 'per', robust = TRUE)
+
+stl_ets_model_tst <- stl_ets_model_fit %>% 
+    forecast(method="ets", h = tstng_prds, etsmodel = "MZM", allow.multiplicative.trend = TRUE)
+
+summary(stl_ets_model_tst)
+
+mape_ets <- MAPE(c(test$remesas_trn) - c(stl_ets_model_tst$mean), c(test$remesas_trn))
+
+stl_ets_model_tst %>%
+    autoplot() + ggtitle('STL + ETS') + ylab('Remesas') + xlab('Mes') +
+    annotate("label", x = 2003,
+          y = 150, label = c(paste('MAPE', mape_ets)),
+           color = c("black"))
+
+```
+El mejor modelo encontrado para la suavización exponencial es:
+- el error es tipo Multiplicativa.
+- la tendencia es tipo Aditiva.
+- la estacionalidad no está definida para el modelo. 
+
+El error del conjunto de prueba es `r mape_ets`.
+
+```{r, message=FALSE, warning=FALSE}
+checkresiduals(stl_ets_model_tst$residuals)
+Box.test(stl_ets_model_tst$residuals, type = "Ljung")
+shapiro.test(stl_ets_model_tst$residuals)
+```
+
+El MAPE, la gráfica de autocorrelación y la gráfica de distribución muestran una notable mejora. Los periodos auto correlacionados se notan únicamente en el 12 y 24.
+
+La prueba Ljung-box dice que los residuales no están auto correlacionado (valor p es mayor que el nivel de significancia y se acepta la hipótesis nula).
+
+## ARIMA
+
+Ya que sabemos que la serie esta auto correlacionada, y el modelo ETS no encontró un tipo de estacionalidad, podemos intentar encontrar un ARIMA que disminuye el error.
+
+```{r, warning=FALSE}
+arima_fit <- train %>% model(ARIMA(remesas_trn))
+report(arima_fit)
+
+arima_tst <- arima_fit %>% forecast(h=tstng_prds)
+mape_arima <- MAPE(c(test$remesas_trn) - c(arima_tst$.mean), c(test$remesas_trn))
+arima_tst %>% 
+    autoplot(filter_index(train, "1995 Jan" ~ .)) + 
+    ggtitle('ARIMA (1,0,1)(1,1,0)[12]') + ylab('Remesas') + xlab('Mes') +
+    annotate("label",  x = c(as.Date("2003-01-01")),
+          y = 150, label = c(paste('MAPE', mape_arima)),
+           color = c("black"))
+
+```
+
+El mejor modelo obtenido fue:
+- orden del parte autorregresivo p = 1
+- grado de diferenciación d = 0
+- orden de la parte media móvil q = 1
+- orden de la parte autorregresivo estacional P = 1
+- grado de diferenciación para hacerla un proceso estacionario D = 1. Como la estacionalidad es de periodicidad 12 entonces significa que fue diferenciada en ese periodo.
+
+El modelo SARIMA(1,0,1)(1,1,0)[12] arroja mejores resultados, no solo en la medición de error MAPE, también el criterio de información de Akaike es menor y por lo tanto mejor.
+
+```{r, warning=FALSE}
+aug_arima <- augment(arima_fit)
+
+checkresiduals(aug_arima$.resid)
+Box.test(aug_arima$.resid, type = "Ljung")
+shapiro.test(aug_arima$.resid)
+```
+Los residuales no tienen una distribución normal pero no están auto correlacionados. Porque sabemos que los residuales están auto correlacionados si no está diferenciada.
+
+## Regresión Dinámica
+
+Para la regresión dinámica primero hay que incluir variables predictoras que pueden ser útiles en el análisis.
+Fechas importantes
+- 2007-12, 2009-06 recesión global por crisis hipotecaria.
+- 2020-02, 2020-04 recesión global por COVID-19.
+
+En el modelo también si incluye la tendencia y la estacionalidad.
+
+```{r, warning=FALSE}
+train <- train %>%
+    mutate(crisish = if_else(dates >= as.Date("2007-12-01") & dates <= as.Date("2009-06-01"), 1, 0),
+           crisisc = if_else(dates >= as.Date("2020-02-01") & dates <= as.Date("2020-05-01"), 1, 0)
+           )
+
+test <- test %>%
+    mutate(crisish = if_else(dates >= as.Date("2007-12-01") & dates <= as.Date("2009-06-01"), 1, 0),
+           crisisc = if_else(dates >= as.Date("2020-02-01") & dates <= as.Date("2020-05-01"), 1, 0)
+           )
+
+model_lr_fit <- train %>% model(ARIMA(remesas_trn ~ trend() + season() + crisish + crisisc))
+report(model_lr_fit)
+
+```
+Interesante, los coeficientes de la recesión por covid19 (crisisc) y el periodo 2 (febrero) y el periodo 11 (noviembre) no son estadísticamente significantes.
+
+El modelo ARImA para los errores es (1,0,1)(1,0,1)[12]. O sea, un orden de autocorrelación, un orden de media móvil y lo mismo para el componente estacional.
+
+```{r, warning=FALSE}
+aug_lr <- augment(model_lr_fit)
+model_lr_tst <- model_lr_fit %>% forecast(h=tstng_prds,
+                                          new_data = test
+                                          )
+mape_lr <- MAPE(c(test$remesas_trn) - c(model_lr_tst$.mean), c(test$remesas_trn))
+
+model_lr_tst %>% 
+    autoplot(filter_index(train, "1995 Jan" ~ .)) +
+    ggtitle('Regresión dinámica') + ylab('Remesas') + xlab('Mes') +
+    annotate("label",  x = c(as.Date("2003-01-01")),
+          y = 150, label = c(paste('MAPE', mape_lr)),
+           color = c("black"))
+
+```
+```{r, warning=FALSE}
+checkresiduals(aug_lr$.resid)
+Box.test(aug_lr$.resid, type = "Ljung")
+shapiro.test(aug_lr$.resid)
+```
+
+Aunque el criterio de información de Akaike empeoro un poquito, MAPE mejoro. Los residuos no están auto correlacionados y tampoco son distribuidos normalmente.
+
+## Regresión Armónica
+
+Para la regresión con el componente de Fourier el máximo de términos pares es 6 y por lo tanto cual captura estacionalidad de la serie.
+
+```{r, warning=FALSE}
+model_lrf_fit <- train %>% model(ARIMA(remesas_trn ~ trend() + season() + crisish + crisisc + fourier(K=6)))
+report(model_lrf_fit)
+
+aug_lr <- augment(model_lrf_fit)
+model_lrf_tst <- model_lrf_fit %>% forecast(h=tstng_prds,
+                                          new_data = test
+                                          )
+mape_lrf <- MAPE(c(test$remesas_trn) - c(model_lrf_tst$.mean), c(test$remesas_trn))
+
+model_lrf_tst %>% 
+    autoplot(filter_index(train, "1995 Jan" ~ .)) +
+    ggtitle('Regresión dinámica') + ylab('Remesas') + xlab('Mes') +
+    annotate("label",  x = c(as.Date("2003-01-01")),
+          y = 150, label = c(paste('MAPE', mape_lrf)),
+           color = c("black"))
+
+```
+
+La regresión con los términos de Fourier no representa un cambio significativo en la medición del error ni en el criterio de información con respecto al modelo anterior. Cualquiera de las dos es igual de valida.
+
+
+## Prophet
+
+```{r, warning=FALSE, message=FALSE}
+library(prophet)
+
+train <- data %>%
+    select(remesas) %>%
+    filter_index("1995 Jan" ~ "2021 Sep") %>% 
+    rename('ds' = 'dates',
+           'y' = 'remesas')
+test <- data %>%
+    select(remesas) %>%
+    filter_index("2021 Oct" ~ "2022 Mar") %>% 
+    rename('ds' = 'dates',
+           'y' = 'remesas')
+
+m <- prophet(train)
+future <- make_future_dataframe(m, freq='month', periods=6)
+forecast_p <- predict(m,future)
+
+mape_prophet <- MAPE(c(test$y) - c(tail(forecast_p[c('yhat')],6))$yhat, c(test$y))
+
+plot(m, forecast_p) + ggtitle(paste('Prophet', '| MAPE =', mape_prophet)) +
+    ylab('Remesas serie original') +
+    xlab('Mes')
+
+```
+
+Bastante inútil Prophet para la serie original por que el error es mayor el modelo ingenuo estacional. Veamos si para la serie transformada funciona mejor.
+
+
+```{r, warning=FALSE, message=FALSE}
+train <- data %>%
+    select(remesas_trn) %>%
+    filter_index("1995 Jan" ~ "2021 Sep") %>% 
+    rename('ds' = 'dates',
+           'y' = 'remesas_trn')
+test <- data %>%
+    select(remesas_trn) %>%
+    filter_index("2021 Oct" ~ "2022 Mar") %>% 
+    rename('ds' = 'dates',
+           'y' = 'remesas_trn')
+
+m <- prophet(train)
+future <- make_future_dataframe(m, freq='month', periods=6)
+forecast_p <- predict(m,future)
+
+mape_prophet <- MAPE(c(test$y) - c(tail(forecast_p[c('yhat')],6))$yhat, c(test$y))
+
+
+plot(m, forecast_p) + ggtitle(paste('Prophet', '| MAPE =', mape_prophet)) +
+    ylab('Remesas Transformada Box Cox') +
+    xlab('Mes')
+
+```
+Usando la serie transformada los resultados fueron más favorables para la metodología prophet, aunque para la bulla alrededor del proyecto esperaría que hiciera la transformación y otras optimizaciones automáticamente. Y de todos modos no fueron medianamente cercanos a los últimos modelos usados para que me interesara analizar los errores o los criterios de información.
+
+
+## Conclusión
+
+El mejor método fue la regresión dinámica y la regresión armónica con resultados muy similares, MAPE 2.09 y ACI 1674. Incluso creo podría mejorar con otras variables exógenas que sean causales y no espurias, como podría ser el caso, crecimiento bruto, inversión extranjera, cantidad de migrantes mexicanos en Estados Unidos, tipo de cambio, facilidad de trabajo para los migrantes.
+
+Prophet no esta tan padre para esta serie pero no dudo que tenga mejor desempeño con otras series u otras horizontes de tiempo.
+
+## Referencias
+
+- BANXICO. (2022, February 1). Ingresos y Egresos por Remesas, diciembre de 2021. Retrieved May 9, 2022, from https://www.banxico.org.mx/publicaciones-y-prensa/remesas/%7BB4F97FD6-A4A1-E287-392D-385EF3FB39BD%7D.pdf
+
+- BANXICO. (n.d.). Directo a México. Retrieved May 9, 2022, from https://www.banxico.org.mx/sistemas-de-pago/directo-mexico-remesas-banco-.html
+
+- BANXICO. (n.d.-b). Ingresos por Remesas - (CE81). Retrieved May 9, 2022, from https://www.banxico.org.mx/SieInternet/consultarDirectorioInternetAction.do?accion=consultarCuadro&idCuadro=CE81&locale=es
+
+- Facebook Open Source. (2022, May 5). PROPHET Quick Start. Prophet. Retrieved May 16, 2022, from https://facebook.github.io/prophet/docs/quick_start.html#r-api
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
