@@ -16,20 +16,34 @@ output:
     toc: yes
     df_print: paged
 ---
+
 ```{r setup, echo = FALSE}
 knitr::opts_chunk$set(echo= TRUE,
                       fig.height = 6, fig.width = 7)
 ```
 
+```{=html}
 <style>
 .forceBreak { -webkit-column-break-after: always; break-after: column; }
 </style>
+```
+<center>![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg){width="20%"}</center>
 
-<center>
-![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg){width=20%}
-</center>
+# 1) Definición
 
-# Remesas
+## La primera actividad de cualquier análisis y pronostico es definir el problema
+
+En el libro Forecasting: Principles and Practice, capítulo primero, describe que es un pronóstico, que se puede pronosticar y cómo definir el problema, y algunos casos de estudios.
+
+Lee más en el capítulo <https://otexts.com/fpp3/determining-what-to-forecast.html>
+
+## Descripción del las remesas
+
+Es el envío de dinero de aquellas personas que radican en otra nación a su país de origen. Por ejemplo, los envíos de dinero que realizan los mexicanos que radican en Estados Unidos y Canadá a sus familias que viven en México.
+
+Con el surgimiento de nuevas herramientas tecnológicas es más sencillo realizar esta transacción y el número de usuarios que la hacen se ha incrementado en los últimos años.
+
+También existen las remesas enviadas por personas que se dedican a los negocios y tienen que pagar sueldos a los empleados contratados en el exterior, por ejemplo. Otra transferencia muy común es para estudiantes que no pueden trabajar y necesitan mantenerse en otro país mientras estudian.
 
 Las remesas son la segunda fuente de divisas más importante de México después de los ingresos por petróleo. Representan cerca de 3% del PIB, 50% de las exportaciones petroleras, 135% de la inversión extranjera directa y 189% de los ingresos de viajeros internacionales.
 
@@ -49,116 +63,233 @@ Los egresos por remesas sumaron 1,057 millones de dólares en 2021, cifra mayor 
 
 Con estos resultados, el saldo superavitario de la cuenta de remesas en 2021 fue de 50,537 millones de dólares, cifra superior a la de 39,706 millones de dólares reportada en 2020 y que representó un avance anual de 27.3%.
 
+### Datos
+
 Banco de México registra las remesas como parte de la balanza de pagos y tiene registro mensual desde 1995.
 
-Los datos de banxico pueden ser descargados en el siguiente [enlace](https://www.banxico.org.mx/SieInternet/consultarDirectorioInternetAction.do?accion=consultarCuadro&idCuadro=CE81&locale=es).
+Los datos de Banxico pueden ser descargados en el siguiente [enlace](https://www.banxico.org.mx/SieInternet/consultarDirectorioInternetAction.do?accion=consultarCuadro&idCuadro=CE81&locale=esc)
 
-## Carga de datos
+### Determinar que pronosticar
 
+Se analizara el ingreso total de remesas, como se muestra en la captura siguiente.
 
-```{r, echo=FALSE, warning=FALSE, message=FALSE}
-# For manipulating data
-library(tidyverse)
-library(fpp3)
-library(patchwork)
-library(tidyquant)
-library(fable)
-library(feasts)
-library(tsibble)
-library(fpp2)
-library(readr)
-library(EnvStats)
+![](./images/banxico.png)
 
-library(forcats)
+### Por que es importante analizar y pronosticar en el contexto social
+
+El flujo de remesas internacionales tiene un efecto importante sobre la actividad económica en algunas entidades que se localizan en las regiones centrales y el sur del país. Esto condujo a que el incremento observado en las remesas haya inducido en 2016 un mayor crecimiento económico en estas regiones.
+
+En efecto, como resultado de los patrones de gasto de los hogares, dichas entidades tienden a ser más propensas a concentrar el impacto de las remesas en las actividades comerciales y los servicios. Adicionalmente, los flujos de remesas contribuyen a suavizar el ingreso de los hogares ante choques sobre la actividad económica, en particular en el sector agropecuario.
+
+**Las remesas son la segunda fuente de divisas más importante de México. En los últimos años las remesas han alcanzado máximos históricos, además, han obtenido mayor atención por las recientes investigaciones que señalan cómo cárteles del narco lavan dinero vía remesas.**
+
+# 2) Datos
+
+## Importar
+
+En las siguientes celdas se muestan los pasos para importar los datos desde mi espacio de trabajo. Por que es un archivo en formato Excel, la librería usada es `readxl`.
+
+Lee más en el notebook introductorio visto en clase: [tidyverse](https://iteso.instructure.com/courses/36673/files/7038386?module_item_id=1527658&fd_cookie_set=1), sección *Data science workflow*, paso *1 Import Data*.
+
+También en el libro [R for Data Science](https://r4ds.hadley.nz/import) capítulo 20.
+
+![](./images/import%20tidyverse.png)
+
+```{r}
+library(readxl)
+
+#raw_data = read_xlsx(path = "/Users/danielnuno/GitHub/time_series_s2024/Analisis/remesas banxico.xlsx", sheet = "Hoja1", col_names = FALSE)
+raw_data = read_xlsx(path = "~/GitHub/time_series_s2024/Analisis/remesas/remesas banxico.xlsx", sheet = "Hoja1", col_names = FALSE)
+
+head(raw_data, 20)
+```
+
+## Eliminar filas
+
+Los datos no inician hasta la fila 18. Usando `dplyr::slice` se pueden eliminan las primeras 18 filas.
+
+Lee más en el notebook introductorio visto en clase: [tidyverse](https://iteso.instructure.com/courses/36673/files/7038386?module_item_id=1527658&fd_cookie_set=1), sección *Data science workflow*, paso *3 understand your data*.
+
+![](./images/dplyr.png)
+
+También en el libro [R for Data Science](https://r4ds.hadley.nz/import) capítulo 27.
+
+```{r}
+#raw_data = raw_data[-(1:18), ]
+data = dplyr::slice(raw_data, -(1:18))
+head(data, 2)
+```
+
+## Renombra las columnas
+
+Las dimensiones están nombradas como *...1* y *...2*, por lo tanto es conveniente renombrarlas sin espacios ni caracteres especiales.
+
+```{r}
+colnames(data) = c('date', 'value')
+head(data, 2)
+```
+
+## Cambia el tipo de dato de las columnas
+
+Las columnas son `chr` pero date tiene que ser una fecha mensual y value son millones de dólares. Utiliza `lubridate` para hacer la transformación de la fecha o R básico.
+
+Lee más en el notebook introductorio visto en clase: [tidyverse](https://iteso.instructure.com/courses/36673/files/7038386?module_item_id=1527658&fd_cookie_set=1), sección *Data science workflow*, paso *3 understand your data: data transformation*.
+
+También en el libro [R for Data Science](https://r4ds.hadley.nz/datetimes) capítulo 17.
+
+### Transforma el tipo texto cómo numérico
+
+```{r}
+data$date = as.numeric(data$date)
+```
+
+### Transforma el número a fecha utilizando el argumento origin
+
+El número representa un día en la serie que inicia el primero de enero de 1990. Por lo tanto utilizamos el argumento origin que indica el inicio de la serie.
+
+```{r}
+data$date = as.Date(data$date, origin = "1899-12-30")
+```
+
+### Crea una secuencía explicita la periodicidad mensual
+
+```{r}
+data$date = seq(from = min(data$date), to = max(data$date), by = "1 month")
 library(lubridate)
+library(tsibble)
+data$date = yearmonth(data$date)
+head(data, 2)
+```
 
-# For descriptive statistics and graphing
-library(skimr)
+### Cambia el tipo de dato de la columna value
+
+```{r}
+data$value = as.numeric(data$value)
+head(data, 2)
+```
+
+## Crea un tsibble
+
+Usando `tsibble::as_tsibble()` asigna la fecha como index. En este caso `key` no es necesario pero decide si es importante para tu serie.
+
+Lee más en el notebook introductorio visto en clase: [tidyverse](https://iteso.instructure.com/courses/36673/files/7038386?module_item_id=1527658&fd_cookie_set=1), sección *Data science workflow*, paso *2 Tidy Data*. Y el ejemplo 1.
+
+También la documentación [tsibble](https://tsibble.tidyverts.org/) y el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/tsibbles.html) capítulo 2.1
+
+```{r}
+data = as_tsibble(data, index=date, regular=TRUE)
+head(data, 2)
+```
+
+```{r}
+interval(data)
+```
+
+### Valores faltantes y factores
+Identifica si tu serie de tiempo tiene valores faltantes o factores y has las transformaciones correspondientes con ayuda del libro [R for data science - Transform](https://r4ds.hadley.nz/transform).
+
+
+# 3) Análisis
+
+## Visualización de la serie
+
+Utiliza ggplot2 para gráficar la serie
+
+Lee más en el notebook introductorio visto en clase: [tidyverse](https://iteso.instructure.com/courses/36673/files/7038386?module_item_id=1527658&fd_cookie_set=1), sección *Data science workflow*, paso *3 Understand your data - visualization*.
+
+Ve los ejemplos y explicaciones vistas en clase: [ggplot2](https://iteso.instructure.com/courses/36673/files/7014501?module_item_id=1525430&fd_cookie_set=1), sección *Gráficas con ggplot2*.
+
+![](./images/ggplot2nb.png)
+
+También el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/time-plots.html) capítulo 2.2
+
+![](./images/cap21.png)
+
+### Time plot
+
+```{r}
 library(ggplot2)
-library(scales)
-library(ggExtra)
+library(feasts)
+feasts::autoplot(data) + ggtitle('Remesas por mes') + ylab('Millones de dólares') + xlab('Fecha')
+```
+
+
+### Patrones
+
+Gráficamente presenta **tendencia**, **estacionalidad** y heteroscedasticidad. Parece presentar **ciclos** relacionados a la actividad económica.
+
+Consulta el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/tspatterns.html) capítulo 2.3
+
+### Gráfica estacionales
+
+Una gráfica estacional es lo mismo que un time plot pero graficada usando los periodos estacionales. En este caso la estacionalidad es mensual.
+
+Consulta el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/seasonal-plots.html) capítulo 2.4
+
+```{r}
+data %>% gg_season(value, labels = "both") +
+    ggtitle('Remesas por año') + ylab('Millones de dólares') + xlab('Mes')
+```
+
+Utiliza `plotly::ggplotly()` hacer gráficos interactivos
+
+```{r}
+suppressWarnings(library(plotly))
+
+yearly_data_plot = data %>% gg_season(value, labels = "both") +
+    ggtitle('Remesas por año') + ylab('Millones de dólares') + xlab('Mes')
+
+ggplotly(yearly_data_plot)
+```
+
+### Sub gráficas estacionales
+
+Un gráfico alternativo que enfatiza los patrones estacionales es aquel en el que los datos de cada temporada se recopilan en minigráficos de tiempo separados.
+
+Consulta el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/subseries.html) capítulo 2.5
+
+```{r}
+subseries_plot = data %>% gg_subseries(value)
+ggplotly(subseries_plot)
+```
+
+### Gráfico de rezagos
+
+Estos gráficos son gráficos de dispersión evaluados en los rezagos de la misma serie que miden la correlación entre periodos. En otras palabras, para esta serie de tiempo mensual, mide la relación de un mes en el tiempo contra un mes (n lags) del pasado.
+
+Consulta el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/lag-plots.html) capítulo 2.7
+
+```{r}
+lags_plots = data %>% filter(year(date) > 2018) %>% gg_lag(value, geom = "point", lags = 1:12) + labs(x = "lag(Remesa, k)")
+
+suppressWarnings(ggplotly(lags_plots))
+```
+
+### Autocorrelación
+
+Así como la correlación mide el alcance de una relación lineal entre dos variables, la autocorrelación mide la relación lineal entre valores rezagados de una serie temporal.
+
+Consulta el libro [Forecast: Principles and Practice](hhttps://otexts.com/fpp3/acf.html) capítulo 2.8
+
+```{r}
+data %>% ACF(value, lag_max = 12)
 ```
 
 ```{r}
-# raw data manipulation
-raw_data <- read_csv("remesas_banxico.csv", col_names = FALSE, skip = 10, show_col_types = FALSE)
-
-sub_column_names <- raw_data[5,2:length(raw_data)] %>% 
-    str_replace_all("�", "o") %>% 
-    str_replace_all("\\s+", "_")
-column_names <- raw_data[1,2:length(raw_data)] %>%
-    str_replace_all("�", "o") %>% 
-    str_replace_all("\\s+", "_") %>% 
-    paste(sub_column_names)
-
-remesas_dates <- as.Date(raw_data$X1[10:length(raw_data$X1)], '%d/%m/%Y')
-raw_data <- slice(raw_data[-c(1)], 10:n())
-raw_data <- as_tibble(lapply(raw_data, as.numeric))
-raw_data$dates <- yearmonth(remesas_dates)
-colnames(raw_data) <- c(column_names, 'dates')
-
-data <- select(raw_data, 'Remesas_Familiares,_Total Millones_de_Dolares', 'dates')
-data <- as_tsibble(raw_data, index=dates)
-
-totals_columns <- c('Remesas_Familiares,_Total Millones_de_Dolares',
-                    'Remesas_Familiares,_Total Miles_de_Operaciones',
-                    'Remesas_Familiares,_Promedio_Total Dolares')
-totals_columns <- c('Remesas_Familiares,_Total Millones_de_Dolares')
-
-# final time series
-data <- select(data, 'Remesas_Familiares,_Total Millones_de_Dolares')
-data <- data %>% rename('remesas' = 'Remesas_Familiares,_Total Millones_de_Dolares')
+data %>% ACF(value, lag_max = 24) %>% autoplot() + labs(title='Remesas por año')
 ```
 
+Cuando los datos tienen **tendencia**, las autocorrelaciones para desfases pequeños tienden a ser grandes y positivas porque las observaciones cercanas en el tiempo también lo son en valor. Por lo tanto, el ACF de una serie temporal con tendencia tiende a tener valores positivos que disminuyen lentamente a medida que aumentan los rezagos.
 
-```{r}
-print(paste('fecha inicial', min(data$dates)))
-print(paste('fecha final', max(data$dates)))
-print(paste('observaciones', nrow(data)))
-print(paste('existen', sum(is.na(data)), 'datos faltantes'))
-```
+Cuando los datos son **estacionales**, las autocorrelaciones serán mayores para los rezagos estacionales (en múltiplos del período estacional) que para otros rezagos.
 
-Los datos presentan 5 columnas para los valores totales de las remesas enviadas en millones de dólares segregados la forma que fueron enviadas:
-- Total
-- Money Orders
-- Cheques Personales
-- Transferencias Electrónicas
-- Efectivo y Especie
+Sera importante realizar las mismas gráficas una vez que la serie sea estacional.
 
-Tenemos también información de la cantidad de operaciones y por lo tanto los promedios de cada transacción. En total son 16 columnas incluyendo el mes y año registrados. Son 327 observaciones hasta Enero 2022 y no contiene datos faltantes.
+Además de lo descrito en la primera parte del documento, con las gráficas podemos observar lo siguiente:
 
+Gráficamente presenta **tendencia**, **estacionalidad**. Parece presentar **ciclos** relacionados a la actividad económica.
 
-## Análisis descriptivo
-
-```{r}
-summary(data[, 'remesas'])
-```
-
-
-Observamos que, por mes, el promedio de millones de dólares es de \$1734.2 millones de dólares, el mínimo fue de \$248.1 millones de dólares, mientras que el máximo fue de $4822.1 millones.
-En cuanto las transacciones, en promedio de registran 5.3 millones de transacciones y la media del valor de las transacciones es de $321 dólares.
-
-
-```{r}
-data %>%
-    select('remesas') %>% 
-    autoplot() +
-    ggtitle('Remesas por mes') + ylab('Millones de dólares') + xlab('Fecha')
-```
-
-Gráficamente presenta tendencia, estacionalidad y heteroscedasticidad.
-
-La distribución presenta un sesgo de simetría negativo a la izquierda y aunque los valores no son tan grandes, alguna transformación sería útil antes de hacer la descomposición de la serie y los pronósticos ya que también tiene heterocedasticidad.
-
-```{r}
-p <- ggplot(data, aes(x=dates, y=remesas)) +
-    geom_point() + ggtitle('Remesas por mes') + ylab('Millones de dólares') + xlab('Fecha')
-
-ggMarginal(p, type='histogram', margins = 'y')
-    
-```
-
-Es interesante observar con este gráfico que a partir del año 2004 los datos se ven separados, es decir, la amplitud de los datos se vuelve más grande en cada año que pasa. Podemos concluir tres cosas con esto:
+es interesante observar con este gráfico que a partir del año 2004 los datos se ven separados, es decir, la amplitud de los datos se vuelve más grande en cada año después que pasa. Podemos concluir tres cosas con esto:
 
 - Los primeros siete u ocho años de la serie hay crecimiento, pero a partir del 2003 el crecimiento es exponencial de cómo era antes.
 - En esas fechas se volvió más fácil hacer transferencias electrónicas y por lo tanto contabilizarlo en la balanza de pagos.
@@ -177,20 +308,112 @@ Entonces para considerar como periodos que han afectado la serie de tiempo tenem
 - 2003-10 facilidad de transferencias electrónicas
 - 2007-12, 2009-06 recesión global por crisis hipotecaria
 - 2020-02, 2020-04 recesión global por COVID-19
+- Apartir del 2018 hay un cambio de tendencia y el crecimieto es acelerado.
 
-La siguiente table muestra el crecimiento año tras año:
+Con los gráficos de rezagos podemos apreciar que muestra mayor correlación con el periodo inmediato anterior (1) y el mismo periodo del año pasado (12). Es decir, se espera que se envié una similar cantidad de dinero comparada a estos dos periodos del pasado (1 y 12), pero para el periodo 12 se espera que se envié más dinero.
+
+## Estadística descriptiva
+### Medidas de tendencia central
+
+Calcula la media, moda y mediana. Estos estadisticos pueden ser de la totalidad de la serie o por año o por periodo estacional.
+
+```{r}
+print(paste('fecha inicial', min(data$date)))
+print(paste('fecha final', max(data$date)))
+print(paste('observaciones', nrow(data)))
+print(paste('existen', sum(is.na(data)), 'datos faltantes'))
+```
+
+```{r}
+summary(data[, 'value'])
+```
+
+Observamos que, por mes, el promedio de millones de dólares es de $1,993.2 millones de dólares, el mínimo fue de $248.1 millones de dólares, mientras que el máximo fue de $5,817.8 millones.
+
+```{r}
+boxplot = data %>% 
+            mutate(year = year(date)) %>% 
+            ggplot(aes(x = as.factor(year), y = value)) + 
+            geom_boxplot() + 
+            xlab('Año') + 
+            ylab('Remesas')
+
+ggplotly(boxplot)
+```
+
+### Medidas de dispersión
+
+Estos estadísticos que nos dan información al respecto de la variabilidad o separación de los datos generalmente respecto a la media. Nos ayudan a comprender la distribución de los datos y evitan tomar conclusiones erróneas al comparar distintos grupos.
+
+```{r}
+sd(data$value)
+```
+
+```{r}
+var(data$value)
+```
+
+```{r}
+library(EnvStats)
+kurtosis(data$value)
+skewness(data$value)
+shapiro.test(data$value)
+```
+
+```{r}
+library(ggExtra)
+p <- ggplot(data, aes(x=date, y=value)) + 
+        geom_hline(yintercept =1000) + 
+        geom_hline(yintercept =3000) +
+        geom_point() + 
+        ggtitle('Remesas por mes') + ylab('Millones de dólares') + xlab('Fecha')
+
+ggMarginal(p, type='histogram', margins = 'y')
+```
+
+```{r}
+histogram = ggplot(data, aes(x = value)) +
+  geom_histogram( bins = 20, fill = "black", color = "black", alpha = 0.5) +
+  labs(title = "Histograma",
+       x = "Value",
+       y = "Densidad")
+
+ggplotly(histogram)
+```
+
+La distribución presenta un sesgo de simetría negativo a la izquierda y aunque los valores no son tan grandes, alguna transformación sería útil antes de hacer la descomposición de la serie y los pronósticos.
+
+### Valores atípicos
+
+La detección de outliers es importante para afinar nuestro pronóstico y eliminar las observaciones atípicas.
+Existen diferentes formas de definir valores atípicos. En este caso, si los outliers son 1.5 veces el rango intercuartílico por encima y debajo del 1 y 3 cuartil, sí hay valores atípicos.
+
+```{r}
+ttl_m_dlrs <- data %>% select('value')
+ttl_m_dlrs <- as.numeric(unlist(ttl_m_dlrs[,1]))
+summary(ttl_m_dlrs)[2] - 1.5*IQR(ttl_m_dlrs) >= summary(ttl_m_dlrs)[1]
+summary(ttl_m_dlrs)[5] + 1.5*IQR(ttl_m_dlrs) <= summary(ttl_m_dlrs)[6]
+```
+
+```{r}
+summary(ttl_m_dlrs)[2] - 3*IQR(ttl_m_dlrs) >= summary(ttl_m_dlrs)[1]
+summary(ttl_m_dlrs)[5] + 3*IQR(ttl_m_dlrs) <= summary(ttl_m_dlrs)[6]
+```
+
 
 
 ```{r}
-p <- data %>% as_tibble %>% group_by(years=year(dates)) %>%
-    summarise(remesas=sum(remesas)) %>%
+library(tidyverse)
+
+p <- data %>% as_tibble %>% group_by(years=year(date)) %>%
+    summarise(remesas=sum(value)) %>%
     arrange(desc(years))%>%
     mutate(change = (remesas/lead(remesas) - 1) * 100) %>% 
     filter(years > 1995) %>% 
-    filter(years < 2022)
+    filter(years < 2023)
 
-mean_growth <- data %>% as_tibble %>% group_by(years=year(dates)) %>%
-                    summarise(remesas=sum(remesas)) %>%
+mean_growth <- data %>% as_tibble %>% group_by(years=year(date)) %>%
+                    summarise(remesas=sum(value)) %>%
                     arrange(desc(years))%>%
                     mutate(change = (remesas/lead(remesas) - 1) * 100) %>% 
                     filter(years > 1995) %>% 
@@ -205,57 +428,62 @@ ggplot(p, aes(x=years, y=change)) +
     geom_hline(yintercept=0) +
     ggtitle('Cambio porcentual por año') + ylab('%') + xlab('Mes')
 ```
+El crecimiento promedio es de 11.48%.
 
-Y el crecimiento promedio es de `r mean_growth` %.
+# 4) Pronósticos base
 
-## Datos atípicos
-El siguiente grafico muestra el boxplot por año. Anteriormente calculamos la distribución en conjunta, entonces es interesante ver el comportamiento anual y con el fin detectar outliers.
+## Define los periodos de prueba y entrenamiento
 
+Dependiendo de la cantidad de datos y la periodicidad podrías definir diferente cantidad de observaciones. La regla de pulgar es usar 80% de los datos para entrenar y el restante 20% para validar los resultados.
 
-```{r}
-data %>% group_by(years=year(dates)) %>%
-    ggplot(aes(x=years, y=remesas)) +
-    geom_boxplot(aes(group=years)) +
-    ggtitle('Boxplot remesas por año') + ylab('Remesas') + xlab('Mes')
-```
+Para esta serie de tiempo 6 meses de validación son suficientes.
 
+También en el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/toolbox.html) capítulo 5
 
 
 ```{r}
-ttl_m_dlrs <- data %>% select('remesas')
-ttl_m_dlrs <- as.numeric(unlist(ttl_m_dlrs[,1]))
-summary(ttl_m_dlrs)[2] - 1.5*IQR(ttl_m_dlrs) >= summary(ttl_m_dlrs)[1]
-summary(ttl_m_dlrs)[5] + 1.5*IQR(ttl_m_dlrs) <= summary(ttl_m_dlrs)[6]
+train <- data %>% select(value) %>% filter_index("1995 Jan" ~ "2023 Jun")
+test <- data %>% select(value) %>% filter_index("2023 Jun" ~ "2023 Dec")
+tstng_prds <- 6
+frcst_prds <- 6
 ```
 
-Calculando outliers como 1.5 veces el rango intercuartílico por encima y debajo del 1 y 3 cuartil, sí hay valores atípicos.
+## Seasonal Naive
+
+En el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/judgmental.html) capítulo 5, y notebook de clase [pronósticos base](https://iteso.instructure.com/courses/36673/files/7130471?module_item_id=1533792&fd_cookie_set=1) se muestran diferentes métodos iniciales para hacer estimaciones. Estos métodos iniciales son ligados a la experiencia en la serie y el análisis exploratorio realizado con anterioridad.
+
+Utilizando la función` fable::SNAIVE` para el primer pronóstico base
 
 ```{r}
-summary(ttl_m_dlrs)[2] - 3*IQR(ttl_m_dlrs) >= summary(ttl_m_dlrs)[1]
-summary(ttl_m_dlrs)[5] + 3*IQR(ttl_m_dlrs) <= summary(ttl_m_dlrs)[6]
+library(fable)
+models_fit <- train %>% 
+    model(`Seasonal naive` = SNAIVE(value))
+models_tst <- models_fit %>% forecast(h = tstng_prds)
+mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
+snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .)) +
+    ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes')
+
+snaive_plot
 ```
-Calculando valores extremos como 3 veces el rango intercuartílico por encima y debajo del 1 y 3 cuartil no, hay valores extremos.
 
-En ningún caso es necesario quitarlos, pero como ya lo mencioné, en los periodos donde sucede algo importante podemos codificarlos y serán útiles para el análisis de regresión.
 
-- 2003-10 facilidad de transferencias electrónicas
-- 2007-12, 2009-06 recesión global por crisis hipotecaria
-- 2020-02, 2020-04 recesión global por COVID-19
+# 5) Descomposición
 
-## Transformación box cox
+## Transformaciones y adjustes
 
-Tan solo con observar las magnitudes de los valores al inicio y final de la serie no le caería mal una transformación de potencias. El histograma también muestra sesgo negativo. Para tener un mejor punto de comparación con la prueba SHAPIRO-WILK (alpha = 0.05) y el sesgo.
+Consulta el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/transformations.html) capítulo 3.1
+
+Ajustar los datos históricos a menudo puede conducir a series temporales más simples. ejemplos de pueden ser ajustes de calendario, ajustes de población, ajustes de inflación y transformaciones matemáticas. El propósito de estos ajustes y transformaciones es simplificar los patrones en los datos históricos eliminando fuentes conocidas de variación o haciendo que el patrón sea más consistente en todo el conjunto de datos. Los patrones más simples suelen ser más fáciles de modelar y conducen a pronósticos más precisos.
+
+Cómo ya se mencionó anteriormente con el histograma, y con observar las magnitudes de los valores al inicio y final de la serie es conveniente una transformación de potencia. El histograma y el sesgo también muestra sesgo negativo. Además, la prueba de normalidad SHAPIRO-WILK (alpha = 0.05)
+
 
 ```{r}
-skewness(data$remesas)
-shapiro.test(data$remesas)
+qqnorm(data$value)
+qqline(data$value)
 ```
-```{r}
-op <- par(pty = "s", mfrow = c(1, 2))
-qqnorm(data$remesas)
-qqline(data$remesas)
-```
-Valor p es menor que Alpha entonces no tenemos una distribución normal. De hecho estamos lejos de una distribución normal pero el sesgo no esta tan mal siendo `r skewness(data$remesas)`. Queremos lo más acercado a 0 de sesgo.
+
+Valor p es menor que Alpha entonces no tenemos una distribución normal. De hecho, estamos lejos de una distribución normal pero el sesgo no esta tan mal siendo 0.5. Queremos lo más acercado a 0 de sesgo.
 
 Aunque se puede entender y usar la transformación box cox para transformar una distribución no normal a una normal, el principal objetivo es corregir sesgos y varianzas desiguales de la siguiente manera:
 
@@ -268,22 +496,27 @@ $$
 
 El lambda óptimo se encuentra cuando se encuentra la distribución con el máximo loglikelihood o con el coeficiente del gráfico de probabilidad de correlación o Shapiro-Wilk.
 
-El sesgo mejoro a -0.12.
+> Bickel, P. J., & Doksum, K. A. (1981). An analysis of transformations revisited. Journal of the American Statistical Association, 76(374), 296–311. [DOI](https://doi.org/10.1080/01621459.1981.10477649)
+> 
+> Box, G. E. P., & Cox, D. R. (1964). An analysis of transformations. Journal of the Royal Statistical Society. Series B, Statistical Methodology, 26(2), 211–252. [DOI](https://doi.org/10.1111/j.2517-6161.1964.tb00553.x)
 
-```{r, echo=FALSE}
-bc <- EnvStats::boxcox(data$remesas, lambda=c(-2, 2), optimize=TRUE, objective.name='Log-Likelihood')
-bc_data <- EnvStats::boxcoxTransform(data$remesas, bc$lambda)
+
+```{r}
+bc <- EnvStats::boxcox(data$value, lambda=c(-2, 2), optimize=TRUE, objective.name='Log-Likelihood')
+bc_data <- EnvStats::boxcoxTransform(data$value, bc$lambda)
 
 skewness(bc_data)
 shapiro.test(bc_data)
-op <- par(pty = "s", mfrow = c(1, 2))
 qqnorm(bc_data)
 qqline(bc_data)
 
 data <- data %>% mutate('remesas_trn' = bc_data)
-
 ```
-## Descomposición de la serie de tiempo
+
+## Componentes y descomposición STL
+
+Consulta el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/transformations.html) capítulo 3.6
+
 Para estudiar las características de tendencia y estacionalidad se descompone y graficar usando el método STL.
 La función per de *periodicity* es la más adecuada al parámetro de suavización estacional *s.windows*. Es el componente estacional es el más pequeño, siendo la tendencia más significativa.
 
@@ -291,294 +524,48 @@ Podemos observar en el componente estacional captura, que el inicio de año es e
 
 El competente de tendencia y remanentes observamos y confirmamos lo mencionado anteriormente. A partir del 2004 el envío de remesas, o el registro, aumenta considerablemente y el en 2008 y 2020 el remanente es muy significativo. También, a partir del 2020 el componente remanente se acentúa.
 
-```{r}
-stl_model <- data %>% dplyr::select(remesas_trn) %>% stl(s.window = 'per')
-plot(stl_model,main = 'Descomposicón de la serie con STL')
+![](./images/stl.png)
 
+> Cleveland, R. B., Cleveland, W. S., McRae, J. E., & Terpenning, I. J. (1990). STL: A seasonal-trend decomposition procedure based on loess. Journal of Official Statistics, 6(1), 3–33. [http://bit.ly/stl1990](http://bit.ly/stl1990)
+
+```{r}
+stl_model = data %>% dplyr::select(remesas_trn) %>% stl(s.window = 'per')
+plot(stl_model,main = 'Descomposicón de la serie con STL')
 ```
 
+# 6) Pronósticos base
 
-## Definición de entrenamiento y prueba
+## Define los periodos de prueba y entrenamiento
 
-Para una evaluación entre modelos voy a usar los últimos 6 meses.
+Dependiendo de la cantidad de datos y la periodicidad podrías definir diferente cantidad de observaciones. La regla de pulgar es usar 80% de los datos para entrenar y el restante 20% para validar los resultados.
+
+Para esta serie de tiempo 6 meses de validación son suficientes.
+
+También en el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/toolbox.html) capítulo 5
+
 
 ```{r}
-train <- data %>% select(remesas_trn) %>% filter_index("1995 Jan" ~ "2021 Sep")
-test <- data %>% select(remesas_trn) %>% filter_index("2021 Oct" ~ "2022 Mar")
+train <- data %>% select(remesas_trn) %>% filter_index("1995 Jan" ~ "2023 Jun")
+test <- data %>% select(remesas_trn) %>% filter_index("2023 Jun" ~ "2023 Dec")
 tstng_prds <- 6
 frcst_prds <- 6
 ```
 
 ## Seasonal Naive
 
+En el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/judgmental.html) capítulo 5, y notebook de clase [pronósticos base](https://iteso.instructure.com/courses/36673/files/7130471?module_item_id=1533792&fd_cookie_set=1) se muestran diferentes métodos iniciales para hacer estimaciones. Estos métodos iniciales son ligados a la experiencia en la serie y el análisis exploratorio realizado con anterioridad.
+
+Utilizando la función` fable::SNAIVE` para el primer pronóstico base
+
 ```{r}
+library(fable)
 models_fit <- train %>% 
     model(`Seasonal naive` = SNAIVE(remesas_trn))
 models_tst <- models_fit %>% forecast(h = tstng_prds)
 mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
-models_tst %>% autoplot(filter_index(data, "1995 Jan" ~ .)) +
-    ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes') +
-    annotate("label", x = c(as.Date("2003-01-01")),
-           y = 150, label = c(paste('MAPE', (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE)),
-           color = c("black"))
+snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .)) +
+    ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes')
 
+snaive_plot
 ```
-
-```{r, message=FALSE}
-data %>% 
-  model(SNAIVE(remesas_trn)) %>% 
-  gg_tsresiduals() +
-    ggtitle("Diagnóstico de residuales para el modelo de Seasonal Naive")
-
-```
-Los residuales de este prime modelos parecen ser normalmente distribuidos con algunos atípicos. También parece ser una serie muy auto correlacionada con rezagos representativos hasta el periodo 25.
-
-## STL y ETS
-
-El siguiente modelo para probar es con la descomposición STL y suavización exponencial como estimador.
-
-```{r, message=FALSE}
-stl_ets_model_fit <- stl(train, s.window = 'per', robust = TRUE)
-
-stl_ets_model_tst <- stl_ets_model_fit %>% 
-    forecast(method="ets", h = tstng_prds, etsmodel = "MZM", allow.multiplicative.trend = TRUE)
-
-summary(stl_ets_model_tst)
-
-mape_ets <- MAPE(c(test$remesas_trn) - c(stl_ets_model_tst$mean), c(test$remesas_trn))
-
-stl_ets_model_tst %>%
-    autoplot() + ggtitle('STL + ETS') + ylab('Remesas') + xlab('Mes') +
-    annotate("label", x = 2003,
-          y = 150, label = c(paste('MAPE', mape_ets)),
-           color = c("black"))
-
-```
-El mejor modelo encontrado para la suavización exponencial es:
-- el error es tipo Multiplicativa.
-- la tendencia es tipo Aditiva.
-- la estacionalidad no está definida para el modelo. 
-
-El error del conjunto de prueba es `r mape_ets`.
-
-```{r, message=FALSE, warning=FALSE}
-checkresiduals(stl_ets_model_tst$residuals)
-Box.test(stl_ets_model_tst$residuals, type = "Ljung")
-shapiro.test(stl_ets_model_tst$residuals)
-```
-
-El MAPE, la gráfica de autocorrelación y la gráfica de distribución muestran una notable mejora. Los periodos auto correlacionados se notan únicamente en el 12 y 24.
-
-La prueba Ljung-box dice que los residuales no están auto correlacionado (valor p es mayor que el nivel de significancia y se acepta la hipótesis nula).
-
-## ARIMA
-
-Ya que sabemos que la serie esta auto correlacionada, y el modelo ETS no encontró un tipo de estacionalidad, podemos intentar encontrar un ARIMA que disminuye el error.
-
-```{r, warning=FALSE}
-arima_fit <- train %>% model(ARIMA(remesas_trn))
-report(arima_fit)
-
-arima_tst <- arima_fit %>% forecast(h=tstng_prds)
-mape_arima <- MAPE(c(test$remesas_trn) - c(arima_tst$.mean), c(test$remesas_trn))
-arima_tst %>% 
-    autoplot(filter_index(train, "1995 Jan" ~ .)) + 
-    ggtitle('ARIMA (1,0,1)(1,1,0)[12]') + ylab('Remesas') + xlab('Mes') +
-    annotate("label",  x = c(as.Date("2003-01-01")),
-          y = 150, label = c(paste('MAPE', mape_arima)),
-           color = c("black"))
-
-```
-
-El mejor modelo obtenido fue:
-- orden del parte autorregresivo p = 1
-- grado de diferenciación d = 0
-- orden de la parte media móvil q = 1
-- orden de la parte autorregresivo estacional P = 1
-- grado de diferenciación para hacerla un proceso estacionario D = 1. Como la estacionalidad es de periodicidad 12 entonces significa que fue diferenciada en ese periodo.
-
-El modelo SARIMA(1,0,1)(1,1,0)[12] arroja mejores resultados, no solo en la medición de error MAPE, también el criterio de información de Akaike es menor y por lo tanto mejor.
-
-```{r, warning=FALSE}
-aug_arima <- augment(arima_fit)
-
-checkresiduals(aug_arima$.resid)
-Box.test(aug_arima$.resid, type = "Ljung")
-shapiro.test(aug_arima$.resid)
-```
-Los residuales no tienen una distribución normal pero no están auto correlacionados. Porque sabemos que los residuales están auto correlacionados si no está diferenciada.
-
-## Regresión Dinámica
-
-Para la regresión dinámica primero hay que incluir variables predictoras que pueden ser útiles en el análisis.
-Fechas importantes
-- 2007-12, 2009-06 recesión global por crisis hipotecaria.
-- 2020-02, 2020-04 recesión global por COVID-19.
-
-En el modelo también si incluye la tendencia y la estacionalidad.
-
-```{r, warning=FALSE}
-train <- train %>%
-    mutate(crisish = if_else(dates >= as.Date("2007-12-01") & dates <= as.Date("2009-06-01"), 1, 0),
-           crisisc = if_else(dates >= as.Date("2020-02-01") & dates <= as.Date("2020-05-01"), 1, 0)
-           )
-
-test <- test %>%
-    mutate(crisish = if_else(dates >= as.Date("2007-12-01") & dates <= as.Date("2009-06-01"), 1, 0),
-           crisisc = if_else(dates >= as.Date("2020-02-01") & dates <= as.Date("2020-05-01"), 1, 0)
-           )
-
-model_lr_fit <- train %>% model(ARIMA(remesas_trn ~ trend() + season() + crisish + crisisc))
-report(model_lr_fit)
-
-```
-Interesante, los coeficientes de la recesión por covid19 (crisisc) y el periodo 2 (febrero) y el periodo 11 (noviembre) no son estadísticamente significantes.
-
-El modelo ARImA para los errores es (1,0,1)(1,0,1)[12]. O sea, un orden de autocorrelación, un orden de media móvil y lo mismo para el componente estacional.
-
-```{r, warning=FALSE}
-aug_lr <- augment(model_lr_fit)
-model_lr_tst <- model_lr_fit %>% forecast(h=tstng_prds,
-                                          new_data = test
-                                          )
-mape_lr <- MAPE(c(test$remesas_trn) - c(model_lr_tst$.mean), c(test$remesas_trn))
-
-model_lr_tst %>% 
-    autoplot(filter_index(train, "1995 Jan" ~ .)) +
-    ggtitle('Regresión dinámica') + ylab('Remesas') + xlab('Mes') +
-    annotate("label",  x = c(as.Date("2003-01-01")),
-          y = 150, label = c(paste('MAPE', mape_lr)),
-           color = c("black"))
-
-```
-```{r, warning=FALSE}
-checkresiduals(aug_lr$.resid)
-Box.test(aug_lr$.resid, type = "Ljung")
-shapiro.test(aug_lr$.resid)
-```
-
-Aunque el criterio de información de Akaike empeoro un poquito, MAPE mejoro. Los residuos no están auto correlacionados y tampoco son distribuidos normalmente.
-
-## Regresión Armónica
-
-Para la regresión con el componente de Fourier el máximo de términos pares es 6 y por lo tanto cual captura estacionalidad de la serie.
-
-```{r, warning=FALSE}
-model_lrf_fit <- train %>% model(ARIMA(remesas_trn ~ trend() + season() + crisish + crisisc + fourier(K=6)))
-report(model_lrf_fit)
-
-aug_lr <- augment(model_lrf_fit)
-model_lrf_tst <- model_lrf_fit %>% forecast(h=tstng_prds,
-                                          new_data = test
-                                          )
-mape_lrf <- MAPE(c(test$remesas_trn) - c(model_lrf_tst$.mean), c(test$remesas_trn))
-
-model_lrf_tst %>% 
-    autoplot(filter_index(train, "1995 Jan" ~ .)) +
-    ggtitle('Regresión dinámica') + ylab('Remesas') + xlab('Mes') +
-    annotate("label",  x = c(as.Date("2003-01-01")),
-          y = 150, label = c(paste('MAPE', mape_lrf)),
-           color = c("black"))
-
-```
-
-La regresión con los términos de Fourier no representa un cambio significativo en la medición del error ni en el criterio de información con respecto al modelo anterior. Cualquiera de las dos es igual de valida.
-
-
-## Prophet
-
-```{r, warning=FALSE, message=FALSE}
-library(prophet)
-
-train <- data %>%
-    select(remesas) %>%
-    filter_index("1995 Jan" ~ "2021 Sep") %>% 
-    rename('ds' = 'dates',
-           'y' = 'remesas')
-test <- data %>%
-    select(remesas) %>%
-    filter_index("2021 Oct" ~ "2022 Mar") %>% 
-    rename('ds' = 'dates',
-           'y' = 'remesas')
-
-m <- prophet(train)
-future <- make_future_dataframe(m, freq='month', periods=6)
-forecast_p <- predict(m,future)
-
-mape_prophet <- MAPE(c(test$y) - c(tail(forecast_p[c('yhat')],6))$yhat, c(test$y))
-
-plot(m, forecast_p) + ggtitle(paste('Prophet', '| MAPE =', mape_prophet)) +
-    ylab('Remesas serie original') +
-    xlab('Mes')
-
-```
-
-Bastante inútil Prophet para la serie original por que el error es mayor el modelo ingenuo estacional. Veamos si para la serie transformada funciona mejor.
-
-
-```{r, warning=FALSE, message=FALSE}
-train <- data %>%
-    select(remesas_trn) %>%
-    filter_index("1995 Jan" ~ "2021 Sep") %>% 
-    rename('ds' = 'dates',
-           'y' = 'remesas_trn')
-test <- data %>%
-    select(remesas_trn) %>%
-    filter_index("2021 Oct" ~ "2022 Mar") %>% 
-    rename('ds' = 'dates',
-           'y' = 'remesas_trn')
-
-m <- prophet(train)
-future <- make_future_dataframe(m, freq='month', periods=6)
-forecast_p <- predict(m,future)
-
-mape_prophet <- MAPE(c(test$y) - c(tail(forecast_p[c('yhat')],6))$yhat, c(test$y))
-
-
-plot(m, forecast_p) + ggtitle(paste('Prophet', '| MAPE =', mape_prophet)) +
-    ylab('Remesas Transformada Box Cox') +
-    xlab('Mes')
-
-```
-Usando la serie transformada los resultados fueron más favorables para la metodología prophet, aunque para la bulla alrededor del proyecto esperaría que hiciera la transformación y otras optimizaciones automáticamente. Y de todos modos no fueron medianamente cercanos a los últimos modelos usados para que me interesara analizar los errores o los criterios de información.
-
-
-## Conclusión
-
-El mejor método fue la regresión dinámica y la regresión armónica con resultados muy similares, MAPE 2.09 y ACI 1674. Incluso creo podría mejorar con otras variables exógenas que sean causales y no espurias, como podría ser el caso, crecimiento bruto, inversión extranjera, cantidad de migrantes mexicanos en Estados Unidos, tipo de cambio, facilidad de trabajo para los migrantes.
-
-Prophet no esta tan padre para esta serie pero no dudo que tenga mejor desempeño con otras series u otras horizontes de tiempo.
-
-## Referencias
-
-- BANXICO. (2022, February 1). Ingresos y Egresos por Remesas, diciembre de 2021. Retrieved May 9, 2022, from https://www.banxico.org.mx/publicaciones-y-prensa/remesas/%7BB4F97FD6-A4A1-E287-392D-385EF3FB39BD%7D.pdf
-
-- BANXICO. (n.d.). Directo a México. Retrieved May 9, 2022, from https://www.banxico.org.mx/sistemas-de-pago/directo-mexico-remesas-banco-.html
-
-- BANXICO. (n.d.-b). Ingresos por Remesas - (CE81). Retrieved May 9, 2022, from https://www.banxico.org.mx/SieInternet/consultarDirectorioInternetAction.do?accion=consultarCuadro&idCuadro=CE81&locale=es
-
-- Facebook Open Source. (2022, May 5). PROPHET Quick Start. Prophet. Retrieved May 16, 2022, from https://facebook.github.io/prophet/docs/quick_start.html#r-api
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
