@@ -1,0 +1,490 @@
+---
+title: 'Maestría Ciencia de Datos: Series de Tiempo'
+subtitle: 'Examen parcial'
+author: 'Alumno: Daniel Nuño, daniel.nuno@iteso.mx'
+date: "Abril 30, 2022"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6,
+                      fig.width = 7)
+```
+
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+
+<center>
+![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg){width=20%}
+</center>
+
+# Preguntas
+
+En sus palabras responda:
+
+## Autocorrelación
+
+### ¿Qué es la función de autocorrelación?
+
+La autocorrelación indica que elementos cercanos en el tiempo se parecen por el simple hecho de estar cerca comparados con elementos más lejanos.
+Usualmente se aplica a los residuos.
+Las barras representan la correlación que existe, en determinado elemento entre los valores de la serie que se encuentran a un determinado rezago k.
+Se calcula usando el valor esperado, la media y la varianza.
+Es una función que varía entre -1 y 1 lo cual indica que si la correlación es positiva entonces los valores se corresponden con valores similares en el mismo rezago.
+Si la correlación es negativa los valores se corresponden con valores contrarios.
+No necesariamente de diferente signo, sino que de diferente magnitud.
+
+### ¿Cuál es la diferencia entre la función de autocorrelación y la función de autocorrelación parcial?
+
+La función de autocorrelación parcial considera los valores de los intervalos intermedios entre una observación y el rezago.
+En rezago uno ambas funciones producen el mismo resultado
+
+### ¿Para qué se utilizan estas funciones?
+
+Resulta útil para encontrar patrones repetitivos, la relación entre valores actuales y pasadas, y por lo tanto cuales son las más útiles para hacer predecir valores futuros de la misma serie.
+
+### ¿Conoce pruebas estadísticas que puedan ayudar a validar o complementar el análisis realizado con estas funciones?
+
+Prueba Ljung–Box.
+La hipótesis nula indica que no hay correlación en los datos.
+Más formalmente, los datos son independientemente distribuidos.
+La prueba se rechaza cuando el p-value es menor que el nivel de significancia.
+
+## Descomposición
+
+### Explique lo que es la descomposición de una serie de tiempo y los distintos componentes que puede llegar a tener.
+
+Es el proceso y filtración de calcular los distintos componentes.
+Los componentes pueden ser **tendencia**, **estacionalidad**, **ciclos** y **residuos**.
+
+### ¿En qué casos cree usted que sea útil realizar un pronóstico a partir de una descomposición?
+
+Cuando una serie se puede observar claramente la tendencia y la estacionalidad, se puede descomponer para poder estimar por separado la tendencia desestacionalizada y la estacionalidad.
+
+### En general cuando se desean producir pronósticos, ¿cuándo cree usted que debería trabajar sobre datos desestacionalizados y cuándo con la serie original? ¿Qué diferencias prácticas o en la interpretación de los resultados pudiera llegar a observar al hacerlo de una u otra forma?
+
+Dependería del tipo de modelo a usar y la serie.
+Series con claros componentes pueden ser buena idea usar un modelo como STL y hacer pronósticos, principalmente de la tendencia.
+Las diferencias de los resultados y la interpretación entre una serie desestacionalizada y la serie original es un asunto de no olvidar incluir los componentes y entender que cada uno de ellos es una parte de la serie original.
+
+### Algunos tipos de descomposición, como la STL, permiten realizar ajustes al comportamiento de cada componente. ¿En qué se debería fijar para decidir los valores de los parámetros?
+
+STL trabaja con 6 parámetros, de los cuales 5 son escogidos de forma directa y automática.
+El parámetro de la suavización del componente estacional \$ n\_{s} \$ siempre será impar y determina la variación en los datos que hace el componente estacional.
+Me debería fijar en el gráfico de diagnóstico estacional porque ayuda a decidir cuanta variación en los datos además de la tendencia debería ir en el componente estacional y cuanto en el residual.
+Comparada con diferentes valores, cuando en la gráfica muestra variación adicional puedes determinar que es causada por propiedades de la serie.
+El articulo original también explica que no debería ser menor a 7.[1]
+
+## Residuos
+
+### ¿Cuál es la afectación en un modelo o sus pronósticos, cuando los residuos no se distribuyen de manera normal?
+
+El modelo ni sus pronósticos son estadísticamente válidos.
+
+Cuando no son distribuidos de manera normal, además media diferente de 0, varianza inconstante y esencialmente sesgados, significa que tiene problemas de tendencias o de dispersión irregular y hay algo que falta por explicar y probablemente por faltante de otra variable exógena o que las utilizadas no son las correctas.
+
+### Si los residuos parecen estar auto correlacionados, ¿qué alternativas tiene para intentar mejorar el modelo? Describa lo que podría intentar con cada uno de los modelos que conoce para pronóstico (si hiciera lo mismo para más de uno, lo puede indicar así).
+
+Podría utilizar términos de mayor orden, nuevas variables independientes, transformaciones de poder para disminuir la varianza, eliminar valores atípicos y codificación de variables.
+Podría también aplicar descomposición para separar el proceso auto correlacionado estacional.
+Trabajando con un modelo de regresión lineal, los errores podrían modelarse como una regresión autorregresiva o ARIMA como parte de una regresión dinámica.
+
+## Modelos
+
+### Se ha discutido que usualmente el mejor modelo para activos financieros (índices, acciones, divisas, commodities, etc.) es el modelo Naïve. ¿Por qué es esto así?, ¿qué se debe cumplir para que sea verdad esto?, describa el proceso que deberían seguir esas series.
+
+Porque aunque se puede modelar elegantemente, el activo financiero se comporta como un proceso de caminata aleatoria y esencialmente su valor futuro es el inmediato anterior.
+Para que esto se cumpla implica una variable aleatoria que describe la probabilidad de tomar el siguiente paso que depende de la posición actual y no de alguna posición previa.
+
+### ¿En qué casos pudiera hacer más sentido pronosticar una serie a partir del método de la media?, ¿lo utilizarían ustedes en la práctica?
+
+Es útil cuando el valor esperado de la serie es la media.
+En la práctica lo utilizo para series de tiempo del estado de resultados cuando a veces es más fácil generalizar que desglosar los ingresos y egresos.
+
+### Hay muchas personas que afirman que los modelos ARIMA son más generales que los de suavización exponencial. ¿Existen modelos de suavización exponencial que se puedan expresar como ARIMA? En caso afirmativo, ¿todos los modelos ETS se podrían expresar como modelos ARIMA?
+
+Sí existen modelos de suavización exponencial que se pueden expresar como ARIMA, como el modelo simple de suavización exponencial es muy parecido a un ARIMA con cero órdenes de autoregresión, un orden de integración y un orden de media móvil.
+No todos los modelos ETS se pueden expresar como modelos ARIMA, el modelo multiplicativo de winters no se asemeja a algún modelo ARIMA.
+Creo, esencialmente los modelos que no necesitan el componente de autoregresión.[2]
+
+## Bondad de ajuste, precisión de los pronósticos
+
+### ¿Cuáles métricas de bondad de ajuste conoce?
+
+-   Coeficiente $R^2$ determina la calidad del modelo para replicar los resultados.
+-   Prueba Anderson-Darling para probar que los datos de una muestra provienen de una distribución especifica, usualmente la normal.
+-   Prueba Kolmogorov-Smirnov para determinar el ajuste de dos distribuciones de probabilidad, usualmente entre la normal y otra teórica.
+-   Prueba Shapiro-Wilk prueba la normalidad de una distribución.
+-   AIC
+-   BIC
+
+### ¿Cuándo se pueden utilizar los criterios de información para comparar entre modelos y por qué no se puede en todos los casos?
+
+Los criterios de información pueden comparar dos modelos (o más), y el modelo con el menor valor en el criterio de información es mejor.
+No puede utilizar los criterios de información con modelos de datos transformados y no transformados, esencialmente tiene que ser calculado con la misma muestra de datos.
+
+### Brevemente enliste posibles ventajas/desventajas de las métricas de error RMSE, MAE, MAPE, MASE.
+
+-   MAE es fácil e intuitivo siendo calculado como el promedio de las medias.
+    Sin embargo, pierde el sentido de dirección y no puedes saber si sobreestima o subestima por usar el valor absoluto.
+    No penaliza y es indiferente a atípicos que generan mucho error.
+
+-   MAPE es muy similar a MAE pero es en porcentaje, entonces es más fácil comparar.
+    Pero te metes en problemas cuando $y$ sea 0 ya que tiene que dividir entre $y$.
+
+-   MSE las unidades de $y$ son cuadradas lo cual significa que se pueden mal interpretar si son muy grandes, pero ya penaliza valores de error grandes.
+    Siempre es mayor que cero.
+
+-   RMSE es conveniente porque tiene la misma unidad a $y$.
+    Lo elevas al cuadrado y luego le aplicas raíz.
+    Inconveniente porque no puedes comparar cuando transformas $y$.
+
+### Si estuviera ante un caso en el cual la bondad de ajuste, las métricas de error del pronóstico de un proceso de back-testing apuntaran a distintos modelos, ¿qué haría para decidir cuál modelo utilizar?
+
+Escogería una métrica de error o ajuste, como $R^2$, MAPE o NRMSE porque son mejores, y un criterio de información, AIC.
+De todos los modelos busco el que genere el menor error, pero decidiría en la calidad y simplicidad del modelo usando el criterio de información.
+
+# Ejercicio práctico
+
+Debajo se muestra una lista de series de tiempo que se pueden obtener de la página del FRED (Ferederal Reserve Bank of St. Louis).
+Cada una está asignada a un estudiante.
+
+**IMPMX - Daniel Francisco Nuño Álvarez**
+
+En el FRED se describe a lo que corresponde cada una, así como la fuente que la reporta.
+
+Se solicita que realicen todo el flujo de pronósticos y produzcan pronósticos para los siguientes 3 años.
+
+Muy importante que muestren su razonamiento para las elecciones que realicen, así como el procedimiento completo que llevaron a cabo (aunque hayan intentado con algún modelo y luego lo hayan descartado).
+
+## Descripción de los datos
+
+La serie de tiempo son las importaciones de bienes de Estados Unidos desde México basado en el valor y tiempo reportado en aduanas. Es de frecuencia mensual. Expresada en Millones de dólares. No contiene ajuste estacional. La serie es reportada por *United Stated Census Bureau.* La última fecha de registro es Febrero 2022.
+
+## Importación y limpieza
+
+```{r pkgs, message=FALSE, echo=FALSE}
+library(tidyverse)
+library(fpp3)
+library(patchwork)
+library(tidyquant)
+library(fable)
+library(ggplot2)
+library(feasts)
+library(tsibble)
+library(fpp2)
+```
+
+```{r}
+df <- tq_get("IMPMX",
+             get = "economic.data",
+             from = "1985-01-01")
+
+```
+
+## Análisis exploratorio y visualización
+
+```{r}
+df$date <- yearmonth(df$date)
+df <- as_tsibble(df, key=symbol, index=date)
+df <- df %>% select(price)
+```
+
+```{r}
+df %>% autoplot(price) + ggtitle('US IMPORTS FROM MX') + ylab('Millones USD') + xlab('Month')
+```
+
+```{r}
+summary(df$price)
+
+sd(df$price)
+```
+
+```{r}
+df %>% as_tibble() %>% group_by(years=year(date)) %>% summarise(price=sum(price)) %>% arrange(desc(years)) %>% mutate(change = (price/lead(price) -1)*100) %>% filter(years > 1985) %>% filter(years < 2022)
+```
+
+```{r}
+df %>% as_tibble() %>% group_by(years=year(date)) %>% summarise(price=sum(price)) %>% arrange(desc(years)) %>% mutate(change = (price/lead(price) -1)*100) %>% filter(years > 1985) %>% filter(years < 2022) %>% summarise(mean(change))
+```
+
+Estados Unidos es, por mucho, el destino más importante de las exportaciones mexicanas de bienes.
+Como podemos observar, estamos muy cerca de máximos históricos de \$34,622 millones de dólares siendo la última información reportada de \$32,536 millones de dólares.
+Respecto a la crisis de covid, cayeron un 14,6% respecto al año anterior pero la recuperación de la actividad de exportaciones fue muy rápida.
+La tendencia continúa siendo positiva y aumenta en promedio 9.19% anual.
+
+Parece una gráfica apta para la transformación logarítmica.
+
+No se puede apreciar periodos estacionales fácilmente, y como en la economía sabemos que hay ciclos de los cuales no podemos saber con certidumbre en el futuro, pero observamos y esperamos periodos de recesión que disminuyen la actividad económica.
+
+## Métodos de referencia
+
+
+### Especificación y estimación de métodos de referencia
+Como métodos de referencia utilizare los modelos sencillos como:
+
+- Método del promedio (media): las predicciones de todos los valores futuros son la media de los datos históricos.
+
+
+$$
+\hat{y}_{T+h | T}=\bar{y}=\left(y_{1}+\cdots+y_{T}\right) / T
+$$
+
+- Método ingenuo (naive): el último valor como el pronóstico para todos los valores futuros.
+$$
+\hat{y}_{T+h | T}=y_{T}
+$$
+
+- Método ingenuo estacional (seasonal Naive): Similar al naive, lo que cambia con el anterior es que se agrega un componente para lidiar con datos altamente estacionales.
+$$
+\hat{y}_{T+h | T}=y_{T+h-m(k+1)}
+$$
+
+- Método de la deriva: permite que el pronóstico aumente o disminuya en el tiempo. El aumento del cambio es el cambio promedio en los datos históricos.
+$$
+\hat{y}_{T+h | T}=y_{T}+\frac{h}{T-1} \sum_{t=2}^{T}\left(y_{t}-y_{t-1}\right)=y_{T}+h\left(\frac{y_{T}-y_{1}}{T-1}\right)
+$$
+El periodo de prueba es de 24 meses.
+```{r}
+train <- df %>% filter_index("1985 Jan" ~ "2020 Feb")
+test <- df %>% filter_index("2020 Mar" ~ "2022 Feb")
+tstng_prds <- 24
+frcst_prds <- 3*12
+    
+```
+
+```{r}
+models_fit <- train %>% model(
+                            Mean             = MEAN(price),
+                            `Naïve`          = NAIVE(price),
+                            `Seasonal naïve` = SNAIVE(price),
+                            Drift            = RW(price ~ drift())
+  )
+
+```
+
+
+### Evaluación y pronósticos de métodos de referencia
+
+```{r}
+models_fc <- models_fit %>% forecast(h = tstng_prds)
+models_fc %>%  autoplot(filter_index(df, "1985 Jan" ~ .), level = NULL) +
+    ggtitle('Prónosticos para los siguientes 3 años') +
+    xlab('Mes') +
+    ylab('Millones de dolares')
+```
+Basados en la gráfica podemos ver que el modelo de la deriva generaría los mejores resultados.
+
+```{r}
+aug <- augment(models_fit)
+
+aug  %>% autoplot(.resid) +
+    ggtitle('Residuales del los métodos de referencia')
+
+aug %>%
+  ggplot(aes(x = .resid, color=.model, fill=.model)) +
+  geom_histogram(alpha=0.5) +
+  ggtitle("Histograma de los residuales")
+```
+Como Seasonal Naive parece ser el óptimo para. Como podemos ver a continuación, los residuales están altamente auto correlacionados, pero parecen tener una distribución normal con algunos atípicos de los periodos de recesión en la economía. Usando los últimos dos años para evaluar, viendo el MAPE, el ingenuo y el ingenuo estacional son los mejores de este grupo y los que tiene que mejorar los siguientes modelos.
+
+```{r, message=FALSE}
+df %>% 
+  model(SNAIVE(price)) %>% 
+  gg_tsresiduals() +
+    ggtitle("Diagnóstico de residuales para el modelo de ingenuo estacional")
+
+```
+```{r message=FALSE}
+models_fit %>% forecast(h = tstng_prds) %>% accuracy(test)
+```
+
+
+## Transformación por logatirmo
+Usando logaritmo para disminuir el sesgo y disminuir la magnitud de los valores más altos. Y vuelve a entrenar los modelos de referencia.
+
+```{r, message=FALSE}
+df %>% mutate(log_price=log(df$price)) %>% autoplot(log_price)
+```
+
+```{r, message=FALSE}
+models_fit <- train %>% model(
+                            Mean             = MEAN(log(price)),
+                            `Naïve`          = NAIVE(log(price)),
+                            `Seasonal naïve` = SNAIVE(log(price)),
+                            Drift            = RW(log(price) ~ drift())
+  )
+
+models_fc <- models_fit %>% forecast(h = frcst_prds)
+models_fc %>%  autoplot(filter_index(df, "1985 Jan" ~ .), level = NULL) +
+    ggtitle('Prónosticos para los siguientes 3 años') +
+    xlab('Mes') +
+    ylab('Millones de dolares')
+
+df %>% 
+  model(SNAIVE(log(price))) %>% 
+  gg_tsresiduals() +
+    ggtitle("Diagnóstico de residuales para el modelo de ingenuo estacional")
+
+models_fc %>% accuracy(test)
+
+```
+
+
+## STL
+STL es un modelo de descomposición de series de tiempo, y como ya vimos que tiene mucha tendencia y estacionalidad creo que puede servir para esta serie.
+
+### Especificación y estimación STL
+
+Con STL podemos descomponer la serie en componentes de tendencia, estacionalidad y remanente. Y hay 6 parámetros a elegir, pero el único que le podre atención al parámetro de suavización estacional *s.windows*.
+
+$$
+Y_{t} = T_{t} + S_{t} + R_{t}
+$$
+$$
+Y_{t} = T_{t}S_{t}R_{t}
+$$
+
+```{r, message=FALSE}
+df <- df %>% select(price)
+df_log <- df %>% mutate(log_price = log(price)) %>% select(log_price)
+
+plot(stl(df, s.window = 7))
+plot(stl(df, s.window = 9))
+plot(stl(df, s.window = 13))
+plot(stl(df, s.window = 27))
+plot(stl(df, s.window = 'per'))
+```
+
+La función per de *periodicity* parece ser la más adecuada por que el elemento seasonal es más constante a través del tiempo. Sin embargo, es el componente más pequeño, siendo el remainder más significativo.
+
+```{r, message=FALSE}
+stl_model <- df %>% stl(log(price), s.window = "per")
+plot(stl_model)
+summary(stl_model)
+
+```
+
+### Evaluación y pronósticos STL
+
+Para hacer un pronóstico de la serie tenemos que hacer un pronóstico para cada uno de los componentes pero usando forecast.
+
+
+```{r, message=FALSE}
+stl_model %>% forecast(method="ets", h = frcst_prds) %>% autoplot() + ylab('Log of imports values') + xlab('Month')
+
+```
+```{r, message=FALSE}
+stl_model %>% forecast(method="ets", h = tstng_prds) %>% accuracy()
+```
+Los errores usando STL e ETS como método de estimación mejoro el MAPE en al menos dos unidades.
+
+## ETS
+Los pronósticos obtenidos a través de suavización exponencial son promedios ponderados de las observaciones pasadas, donde los pesos caen exponencialmente. Así, la observación más reciente tiene el mayor peso, seguida de la segunda, tercera, etc. Es útil para hacer pronósticos de series que no tienen patrones claros de tendencia o estacionalidad.
+
+### Especificación y estimación ETS
+
+$$
+\hat{y}_{T+1 | T}=\alpha y_{T}+\alpha(1-\alpha) y_{T-1}+\alpha(1-\alpha)^{2} y_{T-2}+\cdots
+$$
+
+Donde 0≤ $\alpha $ ≤1 es el parámetro de suavización. El modelo está dividido en el error, la tendencia y estacionalidad. Cada componente se define como N (none), A (additive), M (multiplicativo). Como se sabe que tiene tendencia y estacionalidad voy a utilizar el modelo.
+
+```{r, message=FALSE}
+model_fit_ets <- train %>%  model(
+    `HW add` = ETS(log(price) ~ error("A") + trend("A") + season("A")),
+    `HW multi` = ETS(log(price) ~ error("A") + trend("A") + season("M"))
+  )
+
+```
+
+
+### Evaluación y pronósticos ETS
+
+```{r, message=FALSE}
+model_fc_ets <- model_fit_ets %>% forecast(h=frcst_prds)
+model_fc_ets %>% autoplot(filter_index(df, "1985 Jan" ~ .)) +
+    ggtitle('Prónosticos para los siguientes 3 años') +
+    xlab('Mes') +
+    ylab('Millones de dólares')
+
+```
+
+```{r, message=FALSE}
+model_fit_ets %>% forecast(H=tstng_prds) %>% accuracy(test)
+
+```
+
+Usando estos modelos MAPE empeoro.
+
+## ARIMA y SARIMA
+
+### Especificación y estimación ARIMA
+El modelo ARIMA se compone de elementos autorregresivos (p), de diferenciación (d) y medias móviles (q). La diferenciación ayuda a hacer la serie estacionaria. Los modelos de regresión, definidos como:
+
+
+$$
+y_{t}=\phi_0+\phi_{1} y_{t-1}+\phi_{2} y_{t-2}+\cdots+\phi_{p} y_{t-p}+\varepsilon_{t}
+$$
+
+Los modelos de media móvil, definidos como:
+$$
+y_{t}=\theta_0 +\varepsilon_{t}+\theta_{1} \varepsilon_{t-1}+\theta_{2} \varepsilon_{t-2}+\cdots+\theta_{q} \varepsilon_{t-q}
+$$
+
+Voy a utilizar la función auto ARIMA para obtener los parámetros p, d y q que mejor se ajustan a la serie.
+```{r, message=FALSE}
+model_arima_fit <- train %>% model(ARIMA(log(price)))
+report(model_arima_fit)
+```
+Obtuvimos un modelo SARIMA de orden (3, 1, 0)(2, 0, 0)[12], lo que indica en el componente estacional S de la periodicidad de 12 periodos la auto regresión 2 (P). En el componente no estacional obtuvimos 3 periodos autorregresivos y una diferenciación.
+
+### Evaluación y pronósticos ARIMA
+
+```{r, message=FALSE}
+model_arima_fc <- model_arima_fit %>% forecast(h=frcst_prds)
+model_arima_fc %>% autoplot(filter_index(df, "1985 Jan" ~ .)) +
+    ggtitle('Prónosticos para los siguientes 3 años') +
+    xlab('Mes') +
+    ylab('Millones de dólares')
+```
+
+```{r, message=FALSE}
+model_arima_fit %>% forecast(H=tstng_prds) %>% accuracy(test)
+```
+
+Ahora el MAPE de 13.01. Redujo comparado el modelo anterior pero no fue mejor que el modelo STL con ETS.
+
+## Seleccionar modelo
+El modelo ARIMA es el seleccionado debido a tener el menor valor del criterio de información de Akaike.
+
+```{r, message=FALSE}
+report(model_arima_fit)
+
+report(model_fit_ets)
+
+summary(stl_model)
+```
+
+# Referencias
+
+-   Cleveland, R. B., Cleveland, W. S., McRae, J. E., & Terpenning, I. (1990). STL: A Seasonal-Trend Decomposition Procedure Based on Loess. Journal of Official Statistics.
+-   IBM. (n.d.). Time Series Exponential Smoothing Criteria. Retrieved May 1, 2022, from https://www.ibm.com/docs/en/spss-modeler/SaaS?topic=SS3RA7_sub/modeler_mainhelp_client_ddita/clementine/timeseries_exponentialsmoothing_criteria.html
+-   U.S. Census Bureau and U.S. Bureau of Economic Analysis, U.S. Imports of Goods by Customs Basis from Mexico [IMPMX], retrieved from FRED, Federal Reserve Bank of St. Louis; <https://fred.stlouisfed.org/series/IMPMX>, May 1, 2022.
+-   <https://fredhelp.stlouisfed.org/fred/data/understanding-the-data/recession-bars/>
