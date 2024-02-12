@@ -5,7 +5,7 @@ author: 'Alumno: Daniel Nuño, daniel.nuno@iteso.mx'
 date: "Abril 30, 2022"
 output:
   html_notebook:
-    toc: yes
+    toc: yes 
     toc_float: yes
     theme: cosmo
     highlight: tango
