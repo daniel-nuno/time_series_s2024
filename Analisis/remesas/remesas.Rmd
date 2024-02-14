@@ -443,7 +443,7 @@ También en el libro [Forecast: Principles and Practice](https://otexts.com/fpp3
 
 ```{r}
 train <- data %>% select(value) %>% filter_index("1995 Jan" ~ "2023 Jun")
-test <- data %>% select(value) %>% filter_index("2023 Jun" ~ "2023 Dec")
+test <- data %>% select(value) %>% filter_index("2023 Jul" ~ "2023 Dec")
 tstng_prds <- 6
 frcst_prds <- 6
 ```
@@ -452,22 +452,118 @@ frcst_prds <- 6
 
 En el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/judgmental.html) capítulo 5, y notebook de clase [pronósticos base](https://iteso.instructure.com/courses/36673/files/7130471?module_item_id=1533792&fd_cookie_set=1) se muestran diferentes métodos iniciales para hacer estimaciones. Estos métodos iniciales son ligados a la experiencia en la serie y el análisis exploratorio realizado con anterioridad.
 
-Utilizando la función` fable::SNAIVE` para el primer pronóstico base
+Utilizando la función` fable::SNAIVE` para el primer pronóstico base debido a que hay una clara estacionalidad mensual.
 
 ```{r}
 library(fable)
 models_fit <- train %>% 
     model(`Seasonal naive` = SNAIVE(value))
 models_tst <- models_fit %>% forecast(h = tstng_prds)
-mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
 snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .)) +
     ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes')
 
 snaive_plot
 ```
+### Intervalos de predicción
+
+
+```{r}
+models_tst
+models_tst %>% hilo(level = c(80, 95))
+```
+
+### Errores de pronóstico
+
+```{r}
+accuracy(models_fit)
+```
+
+```{r}
+(models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))
+```
+
+### Diagnostico de resiuales
+
+```{r}
+aug = augment(models_fit)
+aug
+```
+
+```{r}
+aug %>% pull(.resid) %>% mean(na.rm = TRUE)
+```
+
+
+```{r}
+aug %>% autoplot(.resid) + xlab("Día") + ylab("") +
+  ggtitle("Residuales del método naïve")
+```
+
+```{r}
+aug %>%
+  ggplot(aes(x = .resid)) +
+  geom_histogram() +
+  ggtitle("Histograma de los residuales")
+```
+
+```{r}
+aug %>% ACF(.resid)
+```
+
+```{r}
+aug %>% ACF(.resid) %>% autoplot() + ggtitle("ACF of residuals")
+```
+
+```{r}
+train %>% 
+  model(SNAIVE(value)) %>% 
+  gg_tsresiduals()
+```
+Observamos que estas gráficas tienen un comportamiento muy distinto al Naïve:
+
+- En la gráfica de los residuales vemos que se distingue claramente un patrón. De hecho, es el mismo patrón exactamente que siguen los datos originales, restándoles su media.
+
+- La función de autocorrelación tiene un comportamiento típico de una caminata aleatoria. Por lo tanto, las autocorrelaciones son significativas.
+
+- El histograma de los residuos muestra claramente que no se distribuyen de manera normal.
+
+### Test de Ljung-Box
+Un test relacionado y que, generalmente, es más preciso es el test de Ljung-Box.
+
+En este caso es igual: valores grandes de la prueba son indicios de que las autocorrelaciones no provienen de ruido blanco.
+
+>Entonces, la hipótesis nula de estas pruebas es que la serie en cuestión no está autocorrelacionada. En otras palabras, la H0 dice que la serie es ruido blanco. Si α es el nivel de significancia (el nivel máximo de error que estamos dispuestos a aceptar) y si el ¨p-value <α, entonces rechazamos H0, de lo contrario, no rechazamos la H0.
+
+```{r}
+aug %>% features(.resid, ljung_box, lag=12, dof=0)
+```
 
 
 # 5) Descomposición
+
+
+## Componentes y descomposición STL
+
+Consulta el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/transformations.html) capítulo 3.6
+
+Para estudiar las características de tendencia y estacionalidad se descompone y graficar usando el método STL.
+La función per de *periodicity* es la más adecuada al parámetro de suavización estacional *s.windows*. Es el componente estacional es el más pequeño, siendo la tendencia más significativa.
+
+Podemos observar en el componente estacional captura, que el inicio de año es el más flojito y que, a mediados del año es cuando se envían más remesas.
+
+El competente de tendencia y remanentes observamos y confirmamos lo mencionado anteriormente. A partir del 2004 el envío de remesas, o el registro, aumenta considerablemente y el en 2008 y 2020 el remanente es muy significativo. También, a partir del 2020 el componente remanente se acentúa.
+
+![](./images/stl.png)
+
+> Cleveland, R. B., Cleveland, W. S., McRae, J. E., & Terpenning, I. J. (1990). STL: A seasonal-trend decomposition procedure based on loess. Journal of Official Statistics, 6(1), 3–33. [http://bit.ly/stl1990](http://bit.ly/stl1990)
+
+```{r}
+stl_model = data %>% dplyr::select(remesas_trn) %>% stl(s.window = 'per')
+plot(stl_model,main = 'Descomposicón de la serie con STL')
+```
+
+
+
 
 ## Transformaciones y adjustes
 
@@ -513,59 +609,76 @@ qqline(bc_data)
 data <- data %>% mutate('remesas_trn' = bc_data)
 ```
 
-## Componentes y descomposición STL
 
-Consulta el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/transformations.html) capítulo 3.6
+# 6) Pronósticos base con STL y tranformación matemática
 
-Para estudiar las características de tendencia y estacionalidad se descompone y graficar usando el método STL.
-La función per de *periodicity* es la más adecuada al parámetro de suavización estacional *s.windows*. Es el componente estacional es el más pequeño, siendo la tendencia más significativa.
-
-Podemos observar en el componente estacional captura, que el inicio de año es el más flojito y que, a mediados del año es cuando se envían más remesas.
-
-El competente de tendencia y remanentes observamos y confirmamos lo mencionado anteriormente. A partir del 2004 el envío de remesas, o el registro, aumenta considerablemente y el en 2008 y 2020 el remanente es muy significativo. También, a partir del 2020 el componente remanente se acentúa.
-
-![](./images/stl.png)
-
-> Cleveland, R. B., Cleveland, W. S., McRae, J. E., & Terpenning, I. J. (1990). STL: A seasonal-trend decomposition procedure based on loess. Journal of Official Statistics, 6(1), 3–33. [http://bit.ly/stl1990](http://bit.ly/stl1990)
+## STL Seasonal Naive
 
 ```{r}
-stl_model = data %>% dplyr::select(remesas_trn) %>% stl(s.window = 'per')
-plot(stl_model,main = 'Descomposicón de la serie con STL')
-```
-
-# 6) Pronósticos base
-
-## Define los periodos de prueba y entrenamiento
-
-Dependiendo de la cantidad de datos y la periodicidad podrías definir diferente cantidad de observaciones. La regla de pulgar es usar 80% de los datos para entrenar y el restante 20% para validar los resultados.
-
-Para esta serie de tiempo 6 meses de validación son suficientes.
-
-También en el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/toolbox.html) capítulo 5
-
-
-```{r}
-train <- data %>% select(remesas_trn) %>% filter_index("1995 Jan" ~ "2023 Jun")
-test <- data %>% select(remesas_trn) %>% filter_index("2023 Jun" ~ "2023 Dec")
-tstng_prds <- 6
-frcst_prds <- 6
-```
-
-## Seasonal Naive
-
-En el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/judgmental.html) capítulo 5, y notebook de clase [pronósticos base](https://iteso.instructure.com/courses/36673/files/7130471?module_item_id=1533792&fd_cookie_set=1) se muestran diferentes métodos iniciales para hacer estimaciones. Estos métodos iniciales son ligados a la experiencia en la serie y el análisis exploratorio realizado con anterioridad.
-
-Utilizando la función` fable::SNAIVE` para el primer pronóstico base
-
-```{r}
-library(fable)
 models_fit <- train %>% 
-    model(`Seasonal naive` = SNAIVE(remesas_trn))
+  model(stlf = decomposition_model(
+    STL(value ~ trend(window = 12), robust = TRUE),
+    NAIVE(season_adjust)
+  ))
 models_tst <- models_fit %>% forecast(h = tstng_prds)
 mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
 snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .)) +
     ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes')
 
 snaive_plot
+```
+```{r}
+?decomposition_model
+```
+
+```{r}
+models_fit <- train %>% 
+  model(stlf = decomposition_model(
+    STL(log(value) ~ trend(window = 12), robust = TRUE),
+    NAIVE(season_adjust)
+  ))
+models_tst <- models_fit %>% forecast(h = tstng_prds)
+mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
+snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .)) +
+    ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes')
+
+snaive_plot
+```
+
+
+```{r}
+models_fit <- train %>% 
+  model(
+    `Seasonal naive` = SNAIVE(value),
+    stlf = decomposition_model(
+    STL(value ~ trend(window = 12), robust = TRUE),
+    NAIVE(season_adjust)),
+    log_stlf = decomposition_model(
+            STL(log(value) ~ trend(window = 12), robust = TRUE),
+            NAIVE(season_adjust))
+  )
+models_tst <- models_fit %>% forecast(h = tstng_prds)
+mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
+snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .), level = NULL) +
+    ggtitle('Diferentes modelos') + ylab('Remesas') + xlab('Mes')
+
+snaive_plot
+```
+
+```{r}
+models_tst
+models_tst %>% hilo(level = c(80, 95))
+```
+
+```{r}
+accuracy(models_fit)
+```
+
+```{r}
+train %>% 
+  model(decomposition_model(
+            STL(log(value) ~ trend(window = 12), robust = TRUE),
+            NAIVE(season_adjust))) %>% 
+  gg_tsresiduals()
 ```
 
