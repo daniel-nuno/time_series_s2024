@@ -495,8 +495,8 @@ aug %>% pull(.resid) %>% mean(na.rm = TRUE)
 
 
 ```{r}
-aug %>% autoplot(.resid) + xlab("Día") + ylab("") +
-  ggtitle("Residuales del método naïve")
+aug %>% autoplot(.resid) + xlab("Mes") + ylab("") +
+  ggtitle("Residuales del método seasonal naïve")
 ```
 
 ```{r}
@@ -541,7 +541,6 @@ aug %>% features(.resid, ljung_box, lag=12, dof=0)
 
 # 5) Descomposición
 
-
 ## Componentes y descomposición STL
 
 Consulta el libro [Forecast: Principles and Practice](https://otexts.com/fpp3/transformations.html) capítulo 3.6
@@ -558,7 +557,7 @@ El competente de tendencia y remanentes observamos y confirmamos lo mencionado a
 > Cleveland, R. B., Cleveland, W. S., McRae, J. E., & Terpenning, I. J. (1990). STL: A seasonal-trend decomposition procedure based on loess. Journal of Official Statistics, 6(1), 3–33. [http://bit.ly/stl1990](http://bit.ly/stl1990)
 
 ```{r}
-stl_model = data %>% dplyr::select(remesas_trn) %>% stl(s.window = 'per')
+stl_model = data %>% dplyr::select(value) %>% stl(s.window = 'per')
 plot(stl_model,main = 'Descomposicón de la serie con STL')
 ```
 
@@ -623,7 +622,7 @@ models_fit <- train %>%
 models_tst <- models_fit %>% forecast(h = tstng_prds)
 mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
 snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .)) +
-    ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes')
+    ggtitle('STL') + ylab('Remesas') + xlab('Mes')
 
 snaive_plot
 ```
@@ -681,4 +680,62 @@ train %>%
             NAIVE(season_adjust))) %>% 
   gg_tsresiduals()
 ```
+
+
+```{r}
+models_fit[3] %>% gg_tsresiduals()
+```
+
+## 7) Regresión Lineal
+
+### Datos
+
+La hipótesis radica en la relación y crecimiento económico de Estados Unidos precede y esta correlacionado a el incremento de remesas. Por lo que el índice **Brave-Butters-Kelley** puede ser relevante para la estimación de las remesas.
+
+>The Brave-Butters-Kelley Indexes (BBKI) are a research project of the Federal Reserve Bank of Chicago. The BBK Coincident and Leading Indexes and Monthly GDP Growth for the U.S. are constructed from a collapsed dynamic factor analysis of a panel of 500 monthly measures of real economic activity and quarterly real GDP growth.
+
+Los datos mensuales se pueden obtener de la FRED. [https://fred.stlouisfed.org/series/BBKMGDP](https://fred.stlouisfed.org/series/BBKMGDP)
+
+
+```{r}
+library(tidyquant)
+gdp_us = tq_get("BBKMGDP", get="economic.data", from = "1995-01-01")
+
+```
+
+```{r}
+gdp_us$date = yearmonth(gdp_us$date)
+gdp_us = gdp_us %>% select(date, price) %>% as_tsibble(index=date, regular = TRUE)
+gdp_us
+```
+
+```{r}
+train_gdp <- gdp_us %>% select(price) %>% filter_index("1995 Jan" ~ "2023 Jun")
+test_gdp <- gdp_us %>% select(price) %>% filter_index("2023 Jul" ~ "2023 Dec")
+```
+
+```{r}
+train_gdp = add_column(train_gdp, train$value)
+colnames(train_gdp)[3] = "value"  
+test_gdp = add_column(test_gdp, test$value)
+train_gdp
+```
+
+```{r}
+train_gdp %>% ggplot(aes(x = price, y = log(value))) +
+  labs(y = "Remesas)",
+       x = "GDP % change)") +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE)
+```
+
+
+
+```{r}
+fit_lm <- train_gdp |>
+  model(tslm = TSLM(value ~ price))
+
+
+```
+
 
