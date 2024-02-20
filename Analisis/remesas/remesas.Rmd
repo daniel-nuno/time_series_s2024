@@ -700,7 +700,6 @@ Los datos mensuales se pueden obtener de la FRED. [https://fred.stlouisfed.org/s
 ```{r}
 library(tidyquant)
 gdp_us = tq_get("BBKMGDP", get="economic.data", from = "1995-01-01")
-
 ```
 
 ```{r}
@@ -715,16 +714,16 @@ test_gdp <- gdp_us %>% select(price) %>% filter_index("2023 Jul" ~ "2023 Dec")
 ```
 
 ```{r}
-train_gdp = add_column(train_gdp, train$value)
-colnames(train_gdp)[3] = "value"  
+train_gdp = add_column(train_gdp, train$value) #append remesas
+colnames(train_gdp)[3] = "value"
 test_gdp = add_column(test_gdp, test$value)
-train_gdp
+colnames(test_gdp)[3] = "value"
 ```
 
 ```{r}
 train_gdp %>% ggplot(aes(x = price, y = log(value))) +
   labs(y = "Remesas)",
-       x = "GDP % change)") +
+       x = "GDP % change") +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE)
 ```
