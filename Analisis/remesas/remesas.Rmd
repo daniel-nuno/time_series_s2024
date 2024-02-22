@@ -686,9 +686,9 @@ train %>%
 models_fit[3] %>% gg_tsresiduals()
 ```
 
-## 7) Regresión Lineal
+# 7) Regresión Lineal
 
-### Datos
+## Datos
 
 La hipótesis radica en la relación y crecimiento económico de Estados Unidos precede y esta correlacionado a el incremento de remesas. Por lo que el índice **Brave-Butters-Kelley** puede ser relevante para la estimación de las remesas.
 
@@ -696,45 +696,144 @@ La hipótesis radica en la relación y crecimiento económico de Estados Unidos 
 
 Los datos mensuales se pueden obtener de la FRED. [https://fred.stlouisfed.org/series/BBKMGDP](https://fred.stlouisfed.org/series/BBKMGDP)
 
-
+Importar los datos usando tidyquant
 ```{r}
 library(tidyquant)
 gdp_us = tq_get("BBKMGDP", get="economic.data", from = "1995-01-01")
 ```
 
+Convertir la fecha y a tsibble
 ```{r}
 gdp_us$date = yearmonth(gdp_us$date)
 gdp_us = gdp_us %>% select(date, price) %>% as_tsibble(index=date, regular = TRUE)
 gdp_us
 ```
+Convertir el cambio percentual a base 100 con la suma acumulada de los cambios porcentuales
 
 ```{r}
-train_gdp <- gdp_us %>% select(price) %>% filter_index("1995 Jan" ~ "2023 Jun")
-test_gdp <- gdp_us %>% select(price) %>% filter_index("2023 Jul" ~ "2023 Dec")
+gdp_us = gdp_us %>% mutate(gdp_base = cumsum(price))
 ```
 
+
+```{r}
+gdp_us
+```
+
+separas entre entrenamiento y prueba
+
+```{r}
+train_gdp <- gdp_us %>% select(gdp_base) %>% filter_index("1995 Jan" ~ "2023 Jun")
+test_gdp <- gdp_us %>% select(gdp_base) %>% filter_index("2023 Jul" ~ "2023 Dec")
+```
+
+Renombrar las columnas
 ```{r}
 train_gdp = add_column(train_gdp, train$value) #append remesas
-colnames(train_gdp)[3] = "value"
+colnames(train_gdp)[3] = "remesas" 
+colnames(train_gdp)[1] = "gdp"
 test_gdp = add_column(test_gdp, test$value)
-colnames(test_gdp)[3] = "value"
+colnames(test_gdp)[3] = "remesas"
+colnames(test_gdp)[1] = "gdp"
 ```
 
+Gráfica de ambas series a traves del tiempo
+
 ```{r}
-train_gdp %>% ggplot(aes(x = price, y = log(value))) +
-  labs(y = "Remesas)",
-       x = "GDP % change") +
+train_gdp |>
+  pivot_longer(c(remesas, gdp), names_to="Series") |>
+  autoplot(value) +
+  labs(y = "% change")
+```
+
+Gráfica de disperción (correlación) entre ambas series
+
+```{r}
+train_gdp %>% ggplot(aes(x = gdp, y = log(remesas))) +
+  labs(y = "Remesas",
+       x = "GDP Base 1") +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE)
 ```
 
-
+Ajuste de regresión y reporte del modelo
 
 ```{r}
 fit_lm <- train_gdp |>
-  model(tslm = TSLM(value ~ price))
+  model(tslm = TSLM(log(remesas) ~ gdp))
 
-
+report(fit_lm)
 ```
 
 
+
+Tabla aumentada del ajuste del modelo
+
+```{r}
+augment(fit_lm)
+```
+
+
+
+```{r}
+plot_lm = augment(fit_lm) |>
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = remesas, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+ggplotly(plot_lm)
+```
+
+
+Zoom a la gráfica despues de 2018
+```{r}
+augment(fit_lm) |> filter(year(date) > 2018) %>%
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = remesas, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+```
+Analisis de residuales
+
+Primera gráfica: errores en el tiempo para evaluar media y varianza.
+Segunda gráfica: autocorrelación de errores: errores en el pasado afectan el valor actual.
+tercera gráfica: histograma de errores para verificar la normalidad, media sea 0 y sesgo sea 0.
+
+```{r}
+fit_lm %>% gg_tsresiduals()
+```
+
+```{r}
+augment(fit_lm) %>% features(.innov, ljung_box, lag=12)
+```
+Los residuales estan autocorrelacionados, no son homocedasticos y la media de los errores no es cero.
+
+Gráfica de residuales contra valores ajustados. También sirve para identificar outliers
+
+```{r}
+augment(fit_lm) %>% ggplot(aes(x=.fitted, y=.resid)) + geom_point() + labs(x="Fitted", y="Residuals")
+```
+
+Los datos de ambas variables no son estacionarias, es decir tienen tendencía. Y puede ser que ningua tenga relación con la otra ni sea causal de la otra.
+
+Regresiones con relaciones espurias puede que funcionen en el corto plazo pero dejen de funcionar en el futuro.
+
+Pronósticos
+
+```{r}
+test_gdp[c("gdp", "date")]
+```
+
+
+```{r}
+fc_lm = forecast(fit_lm, new_data = test_gdp[c("gdp", "date")])
+data %>% autoplot(value) + autolayer(fc_lm)
+```
+```{r}
+fc_lm
+```
