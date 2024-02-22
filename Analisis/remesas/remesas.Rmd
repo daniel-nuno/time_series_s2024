@@ -702,7 +702,7 @@ library(tidyquant)
 gdp_us = tq_get("BBKMGDP", get="economic.data", from = "1995-01-01")
 ```
 
-Convertir la fecha y a tsibble
+Convertir la fecha y dataframe a tsibble
 ```{r}
 gdp_us$date = yearmonth(gdp_us$date)
 gdp_us = gdp_us %>% select(date, price) %>% as_tsibble(index=date, regular = TRUE)
@@ -742,7 +742,7 @@ Gráfica de ambas series a traves del tiempo
 train_gdp |>
   pivot_longer(c(remesas, gdp), names_to="Series") |>
   autoplot(value) +
-  labs(y = "% change")
+  labs(y = "value")
 ```
 
 Gráfica de disperción (correlación) entre ambas series
