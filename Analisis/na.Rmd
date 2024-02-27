@@ -1,0 +1,99 @@
+---
+title: "Untitled"
+output: html_document
+date: "2024-02-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(tidyquant)
+library(tsibble)
+```
+
+```{r}
+SP500_data <- tq_get("^GSPC", from = "2020-01-01", to = "2020-12-31")
+
+SP500_returns <- SP500_data %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = "daily",
+               col_rename = "SP500_daily_return")
+head(SP500_returns)
+```
+
+
+```{r}
+SP500_data <- tq_get("^GSPC", from = "2020-01-01", to = "2020-12-31")
+
+SP500_returns <- SP500_data %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = "daily",
+               col_rename = "SP500_daily_return")
+
+SP500_returns = fill_gaps(as_tsibble(SP500_returns, index = date))
+head(SP500_returns)
+```
+
+
+# valor anterior 
+
+```{r}
+SP500_data <- tq_get("^GSPC", from = "2020-01-01", to = "2020-12-31")
+
+SP500_returns <- SP500_data %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = "daily",
+               col_rename = "SP500_daily_return")
+
+SP500_returns = fill_gaps(as_tsibble(SP500_returns, index = date)) %>% fill(SP500_daily_return, "up")
+head(SP500_returns)
+```
+
+# reemplazar por zero
+
+```{r}
+SP500_data <- tq_get("^GSPC", from = "2020-01-01", to = "2020-12-31")
+
+SP500_returns <- SP500_data %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = "daily",
+               col_rename = "SP500_daily_return")
+
+SP500_returns = fill_gaps(as_tsibble(SP500_returns, index = date),  SP500_daily_return = 0L)
+head(SP500_returns)
+```
+
+# sequence
+
+```{r}
+SP500_data <- tq_get("^GSPC", from = "2020-01-01", to = "2020-12-31")
+
+SP500_returns <- SP500_data %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = "daily",
+               col_rename = "SP500_daily_return")
+
+SP500_returns = mutate(SP500_returns, dates = row_number())
+head(SP500_returns)
+```
+
+
+
+
+```{r}
+SP500_returns = fill_gaps(as_tsibble(SP500_returns, index = date)) %>% fill(SP500_daily_return)
+
+SP500_returns = fill_gaps(as_tsibble(SP500_returns, index = date),  SP500_daily_return = 0L)
+
+SP500_returns = mutate(date = row_number())
+
+```
+

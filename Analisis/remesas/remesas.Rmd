@@ -702,13 +702,13 @@ library(tidyquant)
 gdp_us = tq_get("BBKMGDP", get="economic.data", from = "1995-01-01")
 ```
 
-Convertir la fecha y dataframe a tsibble
+### Convertir la fecha y dataframe a tsibble
 ```{r}
 gdp_us$date = yearmonth(gdp_us$date)
 gdp_us = gdp_us %>% select(date, price) %>% as_tsibble(index=date, regular = TRUE)
 gdp_us
 ```
-Convertir el cambio percentual a base 100 con la suma acumulada de los cambios porcentuales
+### Convertir el cambio percentual a base 100 con la suma acumulada de los cambios porcentuales
 
 ```{r}
 gdp_us = gdp_us %>% mutate(gdp_base = cumsum(price))
@@ -719,14 +719,14 @@ gdp_us = gdp_us %>% mutate(gdp_base = cumsum(price))
 gdp_us
 ```
 
-separas entre entrenamiento y prueba
+### Separa entre entrenamiento y prueba
 
 ```{r}
 train_gdp <- gdp_us %>% select(gdp_base) %>% filter_index("1995 Jan" ~ "2023 Jun")
 test_gdp <- gdp_us %>% select(gdp_base) %>% filter_index("2023 Jul" ~ "2023 Dec")
 ```
 
-Renombrar las columnas
+### Renombrar las columnas
 ```{r}
 train_gdp = add_column(train_gdp, train$value) #append remesas
 colnames(train_gdp)[3] = "remesas" 
@@ -736,7 +736,7 @@ colnames(test_gdp)[3] = "remesas"
 colnames(test_gdp)[1] = "gdp"
 ```
 
-Gráfica de ambas series a traves del tiempo
+### Gráfica de ambas series a traves del tiempo
 
 ```{r}
 train_gdp |>
@@ -745,7 +745,7 @@ train_gdp |>
   labs(y = "value")
 ```
 
-Gráfica de disperción (correlación) entre ambas series
+### Gráfica de disperción (correlación) entre ambas series
 
 ```{r}
 train_gdp %>% ggplot(aes(x = gdp, y = log(remesas))) +
@@ -755,7 +755,9 @@ train_gdp %>% ggplot(aes(x = gdp, y = log(remesas))) +
   geom_smooth(method = "lm", se = FALSE)
 ```
 
-Ajuste de regresión y reporte del modelo
+
+
+## Ajuste de regresión y reporte del modelo
 
 ```{r}
 fit_lm <- train_gdp |>
@@ -766,13 +768,13 @@ report(fit_lm)
 
 
 
-Tabla aumentada del ajuste del modelo
+### Tabla aumentada del ajuste del modelo
 
 ```{r}
 augment(fit_lm)
 ```
 
-
+### Valores calculados
 
 ```{r}
 plot_lm = augment(fit_lm) |>
@@ -787,7 +789,8 @@ ggplotly(plot_lm)
 ```
 
 
-Zoom a la gráfica despues de 2018
+### Zoom a la gráfica despues de 2018
+
 ```{r}
 augment(fit_lm) |> filter(year(date) > 2018) %>%
   ggplot(aes(x = date)) +
@@ -798,7 +801,7 @@ augment(fit_lm) |> filter(year(date) > 2018) %>%
   ) +
   guides(colour = guide_legend(title = NULL))
 ```
-Analisis de residuales
+### Analisis de residuales
 
 Primera gráfica: errores en el tiempo para evaluar media y varianza.
 Segunda gráfica: autocorrelación de errores: errores en el pasado afectan el valor actual.
@@ -813,7 +816,8 @@ augment(fit_lm) %>% features(.innov, ljung_box, lag=12)
 ```
 Los residuales estan autocorrelacionados, no son homocedasticos y la media de los errores no es cero.
 
-Gráfica de residuales contra valores ajustados. También sirve para identificar outliers
+### Gráfica de residuales contra valores ajustados.
+También sirve para identificar outliers
 
 ```{r}
 augment(fit_lm) %>% ggplot(aes(x=.fitted, y=.resid)) + geom_point() + labs(x="Fitted", y="Residuals")
@@ -823,17 +827,96 @@ Los datos de ambas variables no son estacionarias, es decir tienen tendencía. Y
 
 Regresiones con relaciones espurias puede que funcionen en el corto plazo pero dejen de funcionar en el futuro.
 
-Pronósticos
+### Pronósticos
 
 ```{r}
 test_gdp[c("gdp", "date")]
 ```
 
-
+### Gráfica de prónosticos
 ```{r}
 fc_lm = forecast(fit_lm, new_data = test_gdp[c("gdp", "date")])
 data %>% autoplot(value) + autolayer(fc_lm)
 ```
+### Table de prónosticos
+
 ```{r}
 fc_lm
 ```
+
+## Otras variables predictoras
+
+### Tendencia
+
+$$ 
+y_{t} = \beta_{0} + \beta_{1}t + \epsilon_{t}
+$$
+dónde $ t = {1,2,3, ..., n} $
+
+`TSLM` utiliza el argumento `trend()` para indicar la tendencia.
+
+### Estacionalidad
+
+Para estacionalidad diaria, calcula 6 variables:
+
+$$
+y_{t} = \beta_{0} + \beta_{1}lunes + \beta_{2}martes + \beta_{3}miercoles + \beta_{4}jueves + \beta_{5}viernes + \beta_{6}sabado + \epsilon_{t}
+$$
+
+![](./images/dummy_diario.png)
+
+
+Para estacionalidad mensual, calcula 11 variables:
+
+$$
+y_{t} = \beta_{0} + \beta_{1}enero + \beta_{2}febrero + \beta_{3}marzo + \beta_{4}abril + \beta_{5}mayo + \beta_{6}junio + \beta_{7}julio + \beta_{8}agosto + \beta_{9}septiembre + \beta_{10}octubre + \beta_{11}noviembre + \epsilon_{t}
+$$
+
+Para estacionalidad trimestral calcula 3 variables.
+Para estacionalidad diaria calcula 23 variables.
+Para estacionalidad semanal calcula 51 variables.
+
+`TSLM` utiliza el argumento `season()` para indicar la estacionalidad.
+
+### Atipicos/Spike/Intervention variable
+
+Con lo observado en las gráfica y lo comentado anteriormente, las fechas de importancia para esta serie de tiempo son la crisis hipotecaria y la crisis covid.
+Definir una columna de 0s, exepto entre las fechas indicadas (diciembre 2007 - junio 2009).
+Definir una columna de 0s, exepto entre las fechas indicadas (febrero 2020 - mayo 2020).
+
+Crea una variable dummy de valores atípicos para tu serie de tiempo
+
+```{r}
+train_gdp = train_gdp %>%
+    mutate(crisish = if_else(date >= as.Date("2007-12-01") & 
+                               date <= as.Date("2009-06-01"), 1, 0),
+           crisisc = if_else(date >= as.Date("2020-02-01") & 
+                               date <= as.Date("2020-05-01"), 1, 0)
+           )
+test_gdp = test_gdp %>%
+    mutate(crisish = if_else(date >= as.Date("2007-12-01") & 
+                               date <= as.Date("2009-06-01"), 1, 0),
+           crisisc = if_else(date >= as.Date("2020-02-01") & 
+                               date <= as.Date("2020-05-01"), 1, 0)
+           )
+```
+
+### Rezagos
+
+Usa los valores pasados como predictor de X. Hipotesis: Las remesas (o el cambio porcentual) enviadas en el pasado influyen en el futuro. Revisa la autocorrelación.
+
+$x_{1}$ = remesas enviadas en el mes previo.
+
+$x_{2}$ = remesas enviadas hace dos meses.
+
+$x_{m}$ = remesas enviadas hace m meses.
+
+```{r}
+train_gdp$lag1 = c(NA, train_gdp$remesas[1:length(train_gdp$remesas)-1])
+```
+
+### Fourier series
+
+
+
+
