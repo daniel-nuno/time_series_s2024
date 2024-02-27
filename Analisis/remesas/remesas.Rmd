@@ -903,7 +903,7 @@ test_gdp = test_gdp %>%
 
 ### Rezagos
 
-Usa los valores pasados como predictor de X. Hipotesis: Las remesas (o el cambio porcentual) enviadas en el pasado influyen en el futuro. Revisa la autocorrelación.
+Usa los valores pasados cómo predictor de X. Hipotesis: Las remesas (o el cambio porcentual) enviadas en el pasado influyen en el futuro. Revisa la autocorrelación.
 
 $x_{1}$ = remesas enviadas en el mes previo.
 
@@ -911,9 +911,20 @@ $x_{2}$ = remesas enviadas hace dos meses.
 
 $x_{m}$ = remesas enviadas hace m meses.
 
+El siguiente código muestra como calcular una variable con rezagos = 1
 ```{r}
 train_gdp$lag1 = c(NA, train_gdp$remesas[1:length(train_gdp$remesas)-1])
+train_gdp
 ```
+
+
+
+
+
+
+
+
+
 
 ### Fourier series
 
