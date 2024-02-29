@@ -915,19 +915,32 @@ El siguiente código muestra como calcular una variable con rezagos = 1
 ```{r}
 train_gdp$lag1 = c(NA, train_gdp$remesas[1:length(train_gdp$remesas)-1])
 train_gdp
+test_gdp$lag1 = c(train_gdp$remesas[length(train_gdp$remesas)], test_gdp$remesas[1:length(test_gdp$remesas)-1])
+test_gdp
 ```
 
+### fourier
 
+```{r}
+fit_lm <- train_gdp |>
+  model(tslm = TSLM(log(remesas) ~ gdp + gdp ))
 
+report(fit_lm)
+```
+## regresión lineal múltiple
 
+```{r}
+fit_lm <- train_gdp |>
+  model(tslm = TSLM(log(remesas) ~ trend() + season() + gdp + crisish + crisisc + fourier(K = 2)))
 
+report(fit_lm)
+```
 
+### Selección de variables
 
+```{r}
+glance(fit_lm) |>
+  select(adj_r_squared, CV, AIC, AICc, BIC)
+```
 
-
-
-### Fourier series
-
-
-
-
+### Análisis de residuales
