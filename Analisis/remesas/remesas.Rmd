@@ -923,11 +923,46 @@ test_gdp
 
 ```{r}
 fit_lm <- train_gdp |>
-  model(tslm = TSLM(log(remesas) ~ gdp + gdp ))
+  model(tslm = TSLM(log(remesas) ~ fourier(K=2) ))
 
 report(fit_lm)
 ```
-## regresión lineal múltiple
+
+```{r}
+plot_lm = augment(fit_lm) |>
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = remesas, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+ggplotly(plot_lm)
+```
+
+### Fourier
+
+```{r}
+fit_lm <- train_gdp |>
+  model(tslm = TSLM(log(remesas) ~ trend() + fourier(K=6) ))
+
+report(fit_lm)
+```
+
+```{r}
+plot_lm = augment(fit_lm) |>
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = remesas, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+ggplotly(plot_lm)
+```
+
+
+## Regresión lineal múltiple
 
 ```{r}
 fit_lm <- train_gdp |>
@@ -943,4 +978,182 @@ glance(fit_lm) |>
   select(adj_r_squared, CV, AIC, AICc, BIC)
 ```
 
+```{r}
+fit_lm <- train_gdp |>
+  model(tslm = TSLM(log(remesas) ~ trend() + season() + gdp + crisish + crisisc + lag1))
+
+report(fit_lm)
+
+glance(fit_lm) |>
+  select(adj_r_squared, CV, AIC, AICc, BIC)
+```
+
+
 ### Análisis de residuales
+
+```{r}
+fit_lm %>% gg_tsresiduals()
+```
+## 8) Suavización exponencial
+
+### Simple
+
+```{r}
+fit_es <- train |>
+  model(ETS(value ~ error("A") + trend("N") + season("N")))
+
+report(fit_es)
+```
+Alpha es de 0.58, lo qué indica que la última observación no es la más importante y las pasadas observaciones tienen un peso significativo
+
+AICc es 5705
+
+
+```{r}
+plot_lm = augment(fit_es) |>
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = value, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+ggplotly(plot_lm)
+```
+
+
+### Con tendencia
+
+```{r}
+fit_es <- train |>
+  model(AAN = ETS(value ~ error("A") + trend("A") + season("N")))
+
+report(fit_es)
+```
+```{r}
+plot_lm = augment(fit_es) |>
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = value, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+ggplotly(plot_lm)
+```
+
+```{r}
+fit_es <- train |>
+  model(Damped = ETS(value ~ error("A") + trend("Ad") + season("N")))
+
+report(fit_es)
+```
+
+```{r}
+plot_lm = augment(fit_es) |>
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = value, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+ggplotly(plot_lm)
+```
+
+
+### Con estacionalidad
+
+
+```{r}
+fit_es <- train |>
+  model(AAA = ETS(value ~ error("A") + trend("A") + season("A")))
+
+report(fit_es)
+```
+```{r}
+plot_lm = augment(fit_es) |>
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = value, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+ggplotly(plot_lm)
+```
+
+```{r}
+train
+```
+
+
+
+```{r}
+fit_es <- train |>
+  model(AAA = ETS(value ~ error("M") + trend("A") + season("M")))
+
+report(fit_es)
+```
+
+```{r}
+plot_lm = augment(fit_es) |>
+  ggplot(aes(x = date)) +
+  geom_line(aes(y = value, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+ggplotly(plot_lm)
+```
+
+### Selección del modelo
+
+```{r}
+fit_es <- train |>
+  model(ETS(value))
+
+report(fit_es)
+```
+
+
+```{r}
+components(fit_es) |>
+  autoplot()
+```
+
+
+### Pronostico, intervalo de predicción y análisis de residuales
+
+
+```{r}
+frcst = fit_es %>% forecast(h = tstng_prds)
+
+fit_es %>%
+  forecast(h = tstng_prds) %>%
+  autoplot(train)
+```
+```{r}
+frcst
+```
+
+```{r}
+frcst %>% hilo(level = c(80, 95))
+```
+
+
+```{r}
+accuracy(fit_es)
+```
+
+
+```{r}
+accuracy(fit_lm)
+```
+
+```{r}
+fit_es %>% gg_tsresiduals()
+```
+
+

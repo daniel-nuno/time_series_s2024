@@ -51,7 +51,7 @@ SP500_returns <- SP500_data %>%
                period = "daily",
                col_rename = "SP500_daily_return")
 
-SP500_returns = fill_gaps(as_tsibble(SP500_returns, index = date)) %>% fill(SP500_daily_return, "up")
+META = fill_gaps(META) %>% fill(SP500_daily_return, .direction = "up")
 head(SP500_returns)
 ```
 
