@@ -1156,4 +1156,58 @@ accuracy(fit_lm)
 fit_es %>% gg_tsresiduals()
 ```
 
+## 9) ARIMA
+
+### Estacionariedad y diferenciación
+
+```{r}
+train %>% ACF(value) %>% autoplot()
+```
+
+
+```{r}
+train %>% ACF(difference(value)) %>% autoplot()
+```
+
+
+```{r}
+train %>% features(value, unitroot_kpss)
+```
+La serie no estacionaria de acuerdo a las gráficas y la prueba unitaria
+
+
+```{r}
+train %>% features(difference(value), unitroot_kpss)
+```
+Con una diferenciación, aceptamos la prueba de hipótesis que la serie es estacionaría.
+
+```{r}
+train %>% mutate(diff = difference(value)) %>% autoplot(diff)
+```
+
+La gráfica tiene reversión a la media, aunque su varianza no es constante.
+
+```{r}
+train %>% mutate(diff = difference(log(value))) %>% autoplot(diff)
+```
+
+
+```{r}
+fit_arima = train %>% model(ARIMA(log(value)))
+report(fit_arima)
+```
+
+
+
+```{r}
+accuracy(fit_arima)
+```
+```{r}
+accuracy(fit_ess)
+```
+```{r}
+accuracy(fit_lm)
+```
+
+
 
