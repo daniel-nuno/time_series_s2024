@@ -708,7 +708,7 @@ gdp_us$date = yearmonth(gdp_us$date)
 gdp_us = gdp_us %>% select(date, price) %>% as_tsibble(index=date, regular = TRUE)
 gdp_us
 ```
-### Convertir el cambio percentual a base 100 con la suma acumulada de los cambios porcentuales
+### Convertir el cambio porcentual a base 100 con la suma acumulada de los cambios porcentuales
 
 ```{r}
 gdp_us = gdp_us %>% mutate(gdp_base = cumsum(price))
@@ -736,7 +736,7 @@ colnames(test_gdp)[3] = "remesas"
 colnames(test_gdp)[1] = "gdp"
 ```
 
-### Gráfica de ambas series a traves del tiempo
+### Gráfica de ambas series a través del tiempo
 
 ```{r}
 train_gdp |>
@@ -745,7 +745,7 @@ train_gdp |>
   labs(y = "value")
 ```
 
-### Gráfica de disperción (correlación) entre ambas series
+### Gráfica de dispersión (correlación) entre ambas series
 
 ```{r}
 train_gdp %>% ggplot(aes(x = gdp, y = log(remesas))) +
@@ -789,7 +789,7 @@ ggplotly(plot_lm)
 ```
 
 
-### Zoom a la gráfica despues de 2018
+### Zoom a la gráfica después de 2018
 
 ```{r}
 augment(fit_lm) |> filter(year(date) > 2018) %>%
@@ -801,7 +801,7 @@ augment(fit_lm) |> filter(year(date) > 2018) %>%
   ) +
   guides(colour = guide_legend(title = NULL))
 ```
-### Analisis de residuales
+### Análisis de residuales
 
 Primera gráfica: errores en el tiempo para evaluar media y varianza.
 Segunda gráfica: autocorrelación de errores: errores en el pasado afectan el valor actual.
@@ -814,18 +814,18 @@ fit_lm %>% gg_tsresiduals()
 ```{r}
 augment(fit_lm) %>% features(.innov, ljung_box, lag=12)
 ```
-Los residuales estan autocorrelacionados, no son homocedasticos y la media de los errores no es cero.
+Los residuales estan autocorrelacionados, no son homocedástico y la media de los errores no es cero.
 
 ### Gráfica de residuales contra valores ajustados.
-También sirve para identificar outliers
+También sirve para identificar atípicos
 
 ```{r}
 augment(fit_lm) %>% ggplot(aes(x=.fitted, y=.resid)) + geom_point() + labs(x="Fitted", y="Residuals")
 ```
 
-Los datos de ambas variables no son estacionarias, es decir tienen tendencía. Y puede ser que ningua tenga relación con la otra ni sea causal de la otra.
+Los datos de ambas variables no son estacionarios, es decir tienen tendencia. Y puede ser que ninguna tenga relación con la otra ni sea causal de la otra.
 
-Regresiones con relaciones espurias puede que funcionen en el corto plazo pero dejen de funcionar en el futuro.
+Regresiones con relaciones espurias puede que funcionen en el corto plazo, pero dejen de funcionar en el futuro.
 
 ### Pronósticos
 
@@ -838,7 +838,7 @@ test_gdp[c("gdp", "date")]
 fc_lm = forecast(fit_lm, new_data = test_gdp[c("gdp", "date")])
 data %>% autoplot(value) + autolayer(fc_lm)
 ```
-### Table de prónosticos
+### Tabla de prónosticos
 
 ```{r}
 fc_lm
@@ -880,7 +880,7 @@ Para estacionalidad semanal calcula 51 variables.
 
 ### Atipicos/Spike/Intervention variable
 
-Con lo observado en las gráfica y lo comentado anteriormente, las fechas de importancia para esta serie de tiempo son la crisis hipotecaria y la crisis covid.
+Con lo observado en la gráfica y lo comentado anteriormente, las fechas de importancia para esta serie de tiempo son la crisis hipotecaria y la crisis covid.
 Definir una columna de 0s, exepto entre las fechas indicadas (diciembre 2007 - junio 2009).
 Definir una columna de 0s, exepto entre las fechas indicadas (febrero 2020 - mayo 2020).
 
@@ -903,7 +903,7 @@ test_gdp = test_gdp %>%
 
 ### Rezagos
 
-Usa los valores pasados cómo predictor de X. Hipotesis: Las remesas (o el cambio porcentual) enviadas en el pasado influyen en el futuro. Revisa la autocorrelación.
+Usa los valores pasados cómo predictor de X. Hipótesis: Las remesas (o el cambio porcentual) enviadas en el pasado influyen en el futuro. Revisa la autocorrelación.
 
 $x_{1}$ = remesas enviadas en el mes previo.
 
@@ -919,7 +919,7 @@ test_gdp$lag1 = c(train_gdp$remesas[length(train_gdp$remesas)], test_gdp$remesas
 test_gdp
 ```
 
-### fourier
+### Fourier
 
 ```{r}
 fit_lm <- train_gdp |>
@@ -940,7 +940,6 @@ plot_lm = augment(fit_lm) |>
 ggplotly(plot_lm)
 ```
 
-### Fourier
 
 ```{r}
 fit_lm <- train_gdp |>
@@ -1004,7 +1003,7 @@ fit_es <- train |>
 
 report(fit_es)
 ```
-Alpha es de 0.58, lo qué indica que la última observación no es la más importante y las pasadas observaciones tienen un peso significativo
+Alpha es de 0.58, lo que indica que la última observación no es la más importante y las pasadas observaciones tienen un peso significativo
 
 AICc es 5705
 
@@ -1108,7 +1107,7 @@ ggplotly(plot_lm)
 
 ## Selección del modelo
 
-Usando ETS sin especificar ningun parámetro, el modelo se ajusta basado en el el menor error. Esta optimización regresa como resultado un modelo con errores multiplicativos, tendencia aditiva y estacionalidad multiplicativa.
+Usando ETS sin especificar ningún parámetro, el modelo se ajusta basado en el el menor error. Esta optimización regresa como resultado un modelo con errores multiplicativos, tendencia aditiva y estacionalidad multiplicativa.
 El sigma^2 (0.0048) y AIC (5188) indican que es el mejor modelo utilizando ETS.
 
 
@@ -1205,7 +1204,7 @@ fit_arima = train %>% model(ARIMA(log(value)))
 report(fit_arima)
 ```
 
-Utilizando ARIMA, sin especificar ningun paramtro obtenemos 
+Utilizando ARIMA, sin especificar ningún parámetro obtenemos.
 
 ```{r}
 accuracy(fit_arima)
@@ -1244,13 +1243,14 @@ fit_din = train_gdp %>% model(ARIMA(log(remesas) ~ crisisc + crisish))
 report(fit_din)
 fit_din %>% gg_tsresiduals()
 ```
-La última regresión dinámica, utlizando las remesas transformadas matemáticamente y las regresoras cómo valores atípicos dan un buen resultado de sigma^2 (0.0049), AIC (-825) y log likelihood (418). Por lo tanto, de los tres modelos revisados para una regresión dinámica nos quedamos esta.
+La última regresión dinámica, utilizando las remesas transformadas matemáticamente y los regresores cómo valores atípicos dan un buen resultado de sigma^2 (0.0049), AIC (-825) y log likelihood (418). Por lo tanto, de los tres modelos revisados para una regresión dinámica nos quedamos esta.
 
 
 # 11) Compara los diferentes modelos y pronóstica
 
 ## Selección
 Primero comparamos errores utilizando los datos de prueba.
+
 
 ```{r}
 fit_sn %>% forecast(h = tstng_prds) %>% accuracy(test)
