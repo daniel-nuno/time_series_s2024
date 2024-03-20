@@ -2,7 +2,7 @@
 title: 'Análisis de los ingresos por remesas de México'
 subtitle: 'Clase series de tiempo, primavera 2024'
 author: 'Daniel Nuño, daniel.nuno@iteso.mx'
-date: "Feb 4, 2024"
+date: "Marzo 20, 2024"
 output:
   html_notebook:
     toc: yes
@@ -456,9 +456,9 @@ Utilizando la función` fable::SNAIVE` para el primer pronóstico base debido a 
 
 ```{r}
 library(fable)
-models_fit <- train %>% 
+fit_sn <- train %>% 
     model(`Seasonal naive` = SNAIVE(value))
-models_tst <- models_fit %>% forecast(h = tstng_prds)
+models_tst <- fit_sn %>% forecast(h = tstng_prds)
 snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .)) +
     ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes')
 
@@ -475,17 +475,17 @@ models_tst %>% hilo(level = c(80, 95))
 ### Errores de pronóstico
 
 ```{r}
-accuracy(models_fit)
+accuracy(fit_sn)
 ```
 
 ```{r}
-(models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))
+(fit_sn %>% forecast(h = tstng_prds) %>% accuracy(test))
 ```
 
 ### Diagnostico de resiuales
 
 ```{r}
-aug = augment(models_fit)
+aug = augment(fit_sn)
 aug
 ```
 
@@ -614,13 +614,13 @@ data <- data %>% mutate('remesas_trn' = bc_data)
 ## STL Seasonal Naive
 
 ```{r}
-models_fit <- train %>% 
+fit_sn <- train %>% 
   model(stlf = decomposition_model(
     STL(value ~ trend(window = 12), robust = TRUE),
     NAIVE(season_adjust)
   ))
-models_tst <- models_fit %>% forecast(h = tstng_prds)
-mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
+models_tst <- fit_sn %>% forecast(h = tstng_prds)
+mape_sn <- (fit_sn %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
 snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .)) +
     ggtitle('STL') + ylab('Remesas') + xlab('Mes')
 
@@ -631,13 +631,13 @@ snaive_plot
 ```
 
 ```{r}
-models_fit <- train %>% 
+fit_sn <- train %>% 
   model(stlf = decomposition_model(
     STL(log(value) ~ trend(window = 12), robust = TRUE),
     NAIVE(season_adjust)
   ))
-models_tst <- models_fit %>% forecast(h = tstng_prds)
-mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
+models_tst <- fit_sn %>% forecast(h = tstng_prds)
+mape_sn <- (fit_sn %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
 snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .)) +
     ggtitle('Seasonal Naive') + ylab('Remesas') + xlab('Mes')
 
@@ -646,7 +646,7 @@ snaive_plot
 
 
 ```{r}
-models_fit <- train %>% 
+fit_sn <- train %>% 
   model(
     `Seasonal naive` = SNAIVE(value),
     stlf = decomposition_model(
@@ -656,8 +656,8 @@ models_fit <- train %>%
             STL(log(value) ~ trend(window = 12), robust = TRUE),
             NAIVE(season_adjust))
   )
-models_tst <- models_fit %>% forecast(h = tstng_prds)
-mape_sn <- (models_fit %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
+models_tst <- fit_sn %>% forecast(h = tstng_prds)
+mape_sn <- (fit_sn %>% forecast(h = tstng_prds) %>% accuracy(test))$MAPE
 snaive_plot <- models_tst %>% autoplot(filter_index(data, "2018 Jan" ~ .), level = NULL) +
     ggtitle('Diferentes modelos') + ylab('Remesas') + xlab('Mes')
 
@@ -670,7 +670,7 @@ models_tst %>% hilo(level = c(80, 95))
 ```
 
 ```{r}
-accuracy(models_fit)
+accuracy(fit_sn)
 ```
 
 ```{r}
@@ -683,7 +683,7 @@ train %>%
 
 
 ```{r}
-models_fit[3] %>% gg_tsresiduals()
+fit_sn[3] %>% gg_tsresiduals()
 ```
 
 # 7) Regresión Lineal
@@ -994,9 +994,9 @@ glance(fit_lm) |>
 ```{r}
 fit_lm %>% gg_tsresiduals()
 ```
-## 8) Suavización exponencial
+# 8) Suavización exponencial
 
-### Simple
+## Simple
 
 ```{r}
 fit_es <- train |>
@@ -1022,7 +1022,7 @@ ggplotly(plot_lm)
 ```
 
 
-### Con tendencia
+## Con tendencia
 
 ```{r}
 fit_es <- train |>
@@ -1062,8 +1062,7 @@ ggplotly(plot_lm)
 ```
 
 
-### Con estacionalidad
-
+## Con estacionalidad
 
 ```{r}
 fit_es <- train |>
@@ -1088,7 +1087,6 @@ train
 ```
 
 
-
 ```{r}
 fit_es <- train |>
   model(AAA = ETS(value ~ error("M") + trend("A") + season("M")))
@@ -1108,7 +1106,11 @@ plot_lm = augment(fit_es) |>
 ggplotly(plot_lm)
 ```
 
-### Selección del modelo
+## Selección del modelo
+
+Usando ETS sin especificar ningun parámetro, el modelo se ajusta basado en el el menor error. Esta optimización regresa como resultado un modelo con errores multiplicativos, tendencia aditiva y estacionalidad multiplicativa.
+El sigma^2 (0.0048) y AIC (5188) indican que es el mejor modelo utilizando ETS.
+
 
 ```{r}
 fit_es <- train |>
@@ -1124,7 +1126,7 @@ components(fit_es) |>
 ```
 
 
-### Pronostico, intervalo de predicción y análisis de residuales
+## Pronostico, intervalo de predicción y análisis de residuales
 
 
 ```{r}
@@ -1156,9 +1158,9 @@ accuracy(fit_lm)
 fit_es %>% gg_tsresiduals()
 ```
 
-## 9) ARIMA
+# 9) ARIMA
 
-### Estacionariedad y diferenciación
+## Estacionariedad y diferenciación
 
 ```{r}
 train %>% ACF(value) %>% autoplot()
@@ -1191,22 +1193,117 @@ La gráfica tiene reversión a la media, aunque su varianza no es constante.
 train %>% mutate(diff = difference(log(value))) %>% autoplot(diff)
 ```
 
+```{r}
+train %>% gg_tsdisplay(plot_type = "partial")
+```
+
+
+## Selección del modelo
 
 ```{r}
 fit_arima = train %>% model(ARIMA(log(value)))
 report(fit_arima)
 ```
 
-
+Utilizando ARIMA, sin especificar ningun paramtro obtenemos 
 
 ```{r}
 accuracy(fit_arima)
 ```
 ```{r}
-accuracy(fit_ess)
+accuracy(fit_es)
 ```
 ```{r}
 accuracy(fit_lm)
+```
+
+# 10) Regresión dinámica
+
+```{r}
+train_gdp = train_gdp %>% mutate(diff = difference(log(remesas)))
+
+fit_din = train_gdp %>% model(TSLM(diff ~ crisisc + crisish))
+
+report(fit_din)
+
+fit_din %>% gg_tsresiduals()
+```
+
+
+
+```{r}
+fit_din = train_gdp %>% model(ARIMA(diff ~ crisisc + crisish))
+
+report(fit_din)
+
+fit_din %>% gg_tsresiduals()
+```
+```{r}
+fit_din = train_gdp %>% model(ARIMA(log(remesas) ~ crisisc + crisish))
+
+report(fit_din)
+fit_din %>% gg_tsresiduals()
+```
+La última regresión dinámica, utlizando las remesas transformadas matemáticamente y las regresoras cómo valores atípicos dan un buen resultado de sigma^2 (0.0049), AIC (-825) y log likelihood (418). Por lo tanto, de los tres modelos revisados para una regresión dinámica nos quedamos esta.
+
+
+# 11) Compara los diferentes modelos y pronóstica
+
+## Selección
+Primero comparamos errores utilizando los datos de prueba.
+
+```{r}
+fit_sn %>% forecast(h = tstng_prds) %>% accuracy(test)
+#models_tst <- fit_sn %>% forecast(h = tstng_prds)
+#fit_sn %>% accuracy(test)
+```
+
+```{r}
+fc_lm = forecast(fit_lm, new_data = test_gdp[c("gdp", "date", "crisish", "crisisc", "lag1")])
+fc_lm %>% accuracy(test_gdp)
+```
+```{r}
+fit_es %>% forecast(h=tstng_prds) %>% accuracy(test)
+```
+```{r}
+fit_arima %>% forecast(h=tstng_prds) %>% accuracy(test)
+```
+
+```{r}
+fc_din = forecast(fit_din, new_data = test_gdp[c("date", "crisish", "crisisc")])
+fc_din %>% accuracy(test_gdp)
+```
+El modelo ARIMA es el que tuvo mejor resultado comparando con RMSE. Por lo tanto se realizan los pronosticos con el modelo.
+
+
+```{r}
+fit_arima = data %>% model(ARIMA(log(value)))
+report(fit_arima)
+```
+## Pronóstico
+
+```{r}
+forecast_arima = forecast(fit_arima, h = 6)
+forecast_arima
+forecast_arima %>% autoplot(data) %>% 
+```
+
+```{r}
+augmentt = augment(fit_arima)
+plot = ggplot()+
+  geom_line(aes(x = augmentt$date, y = augmentt$value, colour = "reales")) +
+  geom_line(aes(x = augmentt$date, y = augmentt$.fitted, colour = "ajustados")) +
+  geom_line(aes(x = forecast_arima$date, y = forecast_arima$.mean, colour = "pronóstico"))+
+  labs(y = NULL,
+    title = "remesas"
+  ) +
+  guides(colour = guide_legend(title = NULL))
+ggplotly(plot)
+```
+
+
+```{r}
+frcst %>% hilo(level = c(80, 95))
 ```
 
 
