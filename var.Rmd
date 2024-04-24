@@ -1,0 +1,151 @@
+---
+title: 'S&P 500'
+subtitle: 'Clase series de tiempo, primavera 2024'
+author: 'Daniel Nuño, daniel.nuno@iteso.mx'
+date: "Abril 10, 2024"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6, fig.width = 7)
+```
+
+```{=html}
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+```
+<center>![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg){width="20%"}</center>
+
+```{r}
+library(tidyquant)
+library(tidyverse)
+library(tsibble)
+library(fable)
+library(feasts)
+```
+
+
+# Datos
+
+```{r}
+data = tq_get(c("NVDA", "MSFT"), get = "stock.prices", from = "2023-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
+data
+```
+
+```{r}
+data = tq_get(c("NVDA", "MSFT"), get = "stock.prices", from = "2023-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
+
+returns = data %>% group_by(symbol) %>% tq_transmute(select = adjusted,
+                mutate_fun = periodReturn,
+                period = "daily",
+                col_rename = "return")
+
+returns
+```
+
+
+```{r}
+returns = pivot_wider(returns, id_cols = date, names_from = symbol, values_from = return )
+returns
+```
+
+```{r}
+returns = mutate(returns, t = row_number())
+returns = as_tsibble(returns, index = t)
+returns
+```
+
+```{r}
+fit_var = returns %>% model(VAR(vars(NVDA, MSFT) ~ AR(10)))
+report(fit_var)
+```
+
+```{r}
+fit_var |>
+  forecast(h=20) |>
+  autoplot(returns)
+```
+```{r}
+fore = fit_var |>
+  forecast(h=20)
+fore
+```
+
+
+```{r}
+cummulative_sum_nvda = cumsum(fore$.mean[, "NVDA"])
+forecast_nvda = (1+cummulative_sum_nvda)*421
+```
+
+```{r}
+plot(forecast_nvda)
+```
+
+
+```{r}
+data = pivot_wider(data, id_cols = date, names_from = symbol, values_from = adjusted)
+data
+```
+
+
+```{r}
+data = mutate(data, t = row_number())
+data = as_tsibble(data, index = t)
+data
+```
+
+```{r}
+returns = data %>% difference(MSFT)
+```
+
+```{r}
+fit_var = returns %>% model(VAR(vars(NVDA, MSFT)))
+```
+
+```{r}
+report(fit_var)
+```
+
+```{r}
+fit_var = data %>% model(VAR(vars(NVDA, MSFT), ic = "bic"))
+report(fit_var)
+```
+
+```{r}
+fit_var = data %>% model(var = VAR(vars(NVDA, MSFT) ~ AR(10)))
+```
+
+```{r}
+report(fit_var)
+```
+
+```{r}
+fit_var |>
+  augment() |>
+  ACF(.innov) |>
+  autoplot()
+```
+
+```{r}
+fit_var |>
+  forecast(h=20) |>
+  autoplot(data)
+```
+
+```{r}
+glance(fit_var)$sigma2
+```
+

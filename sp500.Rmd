@@ -1,0 +1,273 @@
+---
+title: 'S&P 500'
+subtitle: 'Clase series de tiempo, primavera 2024'
+author: 'Daniel Nuño, daniel.nuno@iteso.mx'
+date: "Abril 10, 2024"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6, fig.width = 7)
+```
+
+```{=html}
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+```
+<center>![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg){width="20%"}</center>
+
+# Descarga de datos
+
+```{r}
+library(tidyquant)
+library(tidyverse)
+library(tsibble)
+library(fable)
+library(feasts)
+data = tq_get("^GSPC", get="stock.prices", from = "2022-01-01", to = "2024-03-28") %>% select(date, adjusted) %>% as_tsibble(index = date)
+```
+
+```{r}
+data
+```
+
+# Row Number
+
+```{r}
+data_row_number <- data |>
+  mutate(t = row_number()) |>
+  update_tsibble(index = t, regular = TRUE) %>% select(t, adjusted)
+
+data_row_number
+```
+
+```{r}
+data_row_number |>
+  model(
+    STL(adjusted ~ season(period = 5) + season(period = 20) + season(period = 252),
+        robust = TRUE)
+  ) |>
+  components() |>
+  autoplot() + labs(x = "Observation")
+```
+
+```{r}
+my_dcmp_spec <- decomposition_model(
+  STL(adjusted ~ season(period = 5),
+      robust = TRUE),
+  ETS(season_adjust)
+)
+fc <- data_row_number |>
+  model(my_dcmp_spec) |>
+  forecast(h = 25)
+```
+
+```{r}
+plot = fc |>
+  fill_gaps() |>
+  autoplot(data_row_number) +
+  labs(y = "SP500",
+       title = "SP500")
+
+plot
+```
+
+```{r}
+fit3 <- data_row_number %>% 
+  model(
+    harmonic = ARIMA(adjusted ~ trend() + fourier(period = 5, K = 2) + fourier(period = 25, K = 4) + fourier(period = 252, K = 10))
+  )
+
+```
+
+```{r}
+fc <- fit3 %>%
+  forecast(h = 25)
+
+fc |>
+  fill_gaps() |>
+  autoplot(data_row_number) +
+  labs(y = "SP500",
+       title = "SP500")
+```
+
+# Fill na
+
+```{r}
+data
+```
+
+
+```{r}
+data_fill_na = fill_gaps(data) %>% fill(adjusted, .direction = "down")
+data_fill_na
+```
+
+```{r}
+comp_stl <- data_fill_na %>% 
+  model(
+    STL(adjusted, robust = TRUE)
+  ) %>% 
+  components() 
+
+comp_stl %>% 
+  autoplot()
+```
+
+```{r}
+comp_stl %>% 
+  autoplot(season_year)
+comp_stl %>% 
+  autoplot(season_week)
+comp_stl %>% 
+  ggplot(aes(x = date, y = season_adjust)) +
+  geom_line()
+```
+
+```{r}
+my_dcmp_spec <- decomposition_model(
+  STL(adjusted ~ season(period = 5),
+      robust = TRUE),
+  ETS(season_adjust)
+)
+fc <- data_fill_na |>
+  model(my_dcmp_spec) |>
+  forecast(h = 20)
+```
+
+```{r}
+plot = fc |>
+  fill_gaps() |>
+  autoplot(data_fill_na) +
+  labs(y = "SP500",
+       title = "SP500")
+
+plot
+```
+
+```{r}
+fit3 <- data_fill_na %>% 
+  model(
+    harmonic = ARIMA(adjusted ~ trend() + fourier(period = 5, K = 2) + fourier(period = 252, K = 20))
+  )
+
+```
+
+```{r}
+fc <- fit3 %>%
+  forecast(h = 25)
+
+fc |>
+  fill_gaps() |>
+  autoplot(data_fill_na) +
+  labs(y = "SP500",
+       title = "SP500")
+```
+
+```{r}
+fit3 <- data_fill_na %>% 
+  model(
+    harmonic = ARIMA(adjusted ~ trend() + fourier(period = "week", K = 2) +
+          fourier(period = "year", K = 3))
+
+  )
+
+```
+
+```{r}
+fc <- fit3 %>%
+  forecast(h = 25)
+
+fc |>
+  fill_gaps() |>
+  autoplot(data_fill_na) +
+  labs(y = "SP500",
+       title = "SP500")
+```
+
+
+# Prophet
+
+```{r}
+library(fable.prophet)
+colnames(data) = c("ds", "y")
+```
+
+```{r}
+fit_prophet = data %>% model(prophet = prophet(y))
+```
+
+```{r}
+fc <- fit_prophet %>% forecast(h = 25)
+fc %>% autoplot(data)
+```
+
+```{r}
+fit_prophet |>
+  components() |>
+  autoplot()
+```
+
+```{r}
+components(fit_prophet)
+```
+
+```{r}
+fit_prophet = data %>% model(prophet(y ~ season(type = "additive")))
+```
+
+```{r}
+fc <- fit_prophet %>% forecast(h = 25)
+fc %>% autoplot(data)
+```
+
+```{r}
+fit_prophet |>
+  components() |>
+  autoplot()
+```
+
+```{r}
+fit_prophet = data %>% model(prophet(y ~ season(period = "day", order = 5) + #fourier(season = 5, K = 5)
+                                        season(period = "week", order = 2) +
+                                        season(period = "year", order = 2)))
+```
+
+```{r}
+fc <- fit_prophet %>% forecast(h = 25)
+fc %>% autoplot(data)
+```
+
+```{r}
+fit_prophet |>
+  components() |>
+  autoplot()
+```
+
+```{r}
+?prophet
+```
+
+```{r}
+index = tq_index("SP500") %>% select(symbol, weight)
+index = index %>% filter(symbol != "-")
+index
+sum(index$weight)
+```
+
+```{r}
+data = tq_get(index$symbol, get = "stock.prices", from = "2024-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
+```

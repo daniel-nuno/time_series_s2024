@@ -1,0 +1,252 @@
+---
+title: 'S&P 500'
+subtitle: 'Clase series de tiempo, primavera 2024'
+author: 'Daniel Nuño, daniel.nuno@iteso.mx'
+date: "Abril 10, 2024"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+Las paqueterías necesarias para el análisis:
+
+```{r}
+library(tidyverse)
+library(tsibble)
+library(feasts)
+library(fable)
+library(tsibbledata)
+library(fpp3)
+library(patchwork)
+```
+
+# Demanda de energía en Victoria, Australia
+
+```{r}
+vic_elec
+```
+
+La demanda de energía está reportada cada 30 minutos.
+
+```{r}
+p <- vic_elec %>% 
+  autoplot(Demand)
+
+plotly::ggplotly(p)
+```
+
+Al observar la gráfica, parece exhibir tres tipos de estacionalidad:
+
+-   Anual
+-   Semanal
+-   Diaria
+
+```{r}
+s_y <- vic_elec %>% 
+  gg_season(Demand, period = "year")
+s_w <- vic_elec %>% 
+  gg_season(Demand, period = "week")
+s_d <- vic_elec %>% 
+  gg_season(Demand, period = "day")
+
+s_y / s_w / s_d
+```
+
+
+
+```{r}
+s_y / (s_w | s_d)
+```
+
+## Descomposición
+
+Realizamos una descomposición STL de la serie:
+
+```{r}
+# | fig-height: 10
+
+comp_stl <- vic_elec %>% 
+  model(
+    STL(Demand, robust = TRUE)
+  ) %>% 
+  components() 
+
+comp_stl %>% 
+  autoplot()
+```
+
+```{r}
+comp_stl %>% 
+  autoplot(season_year)
+comp_stl %>% 
+  autoplot(season_week)
+comp_stl %>% 
+  autoplot(season_day)
+comp_stl %>% 
+  ggplot(aes(x = Time, y = season_adjust)) +
+  geom_line()
+```
+
+
+
+
+```{r}
+vic_train <- vic_elec %>% 
+  filter_index(. ~ "2014-09-30")
+
+fit1 <- vic_train %>% 
+  model(ets = ETS(Demand ~ error("A") + trend("Ad") + season("A")))
+
+report(fit1)
+```
+
+```{r}
+p <- vic_train %>% 
+  autoplot(Demand) +
+  geom_line(aes(y = .fitted), data = fit1 %>% augment(), color = "firebrick", alpha = 0.5)
+
+plotly::ggplotly(p)
+```
+
+```{r}
+accuracy(fit1)
+```
+```{r}
+fc1 <- fit1 %>% 
+  forecast(h = "3 months")
+
+fc1 %>% 
+  autoplot(vic_elec %>% filter_index("2014-10-01"~.), level = NULL)
+
+fc1 %>% 
+  accuracy(vic_elec)
+```
+
+```{r}
+fit1 %>% 
+  gg_tsresiduals()
+```
+
+
+Dado que los periodos estacionales de esta serie son:
+
+-   Anual: `r 48*365`
+-   Semanal: `r 48*7`
+-   Diaria: `r 48`
+
+No podemos modelar la estacionalidad a partir de `ETS`, ya que permite máximo periodos estacionales = 24.
+
+Vamos a hacer un modelo de descomposición, modelando con SNAIVE las estacionalidades, y con ETS la serie desestacionalizada.
+
+```{r}
+fit2 <- vic_train %>% 
+  model(
+    dcmp = decomposition_model(
+      STL(Demand, robust = TRUE),
+      ETS(season_adjust ~ error("A") + trend("Ad") + season("N"))
+    )
+  )
+
+fit2 %>% report()
+```
+
+```{r}
+accuracy(fit2)
+```
+```{r}
+fc2 <- fit2 %>% 
+  forecast(h = "3 months")
+
+fc2 %>% 
+  autoplot(vic_elec %>% filter_index("2014-10-01"~.), level = NULL)
+
+fc2 %>% 
+  accuracy(vic_elec)
+```
+```{r}
+fit2 %>% 
+  gg_tsresiduals()
+```
+
+
+
+```{r}
+fit3 <- vic_train %>% 
+  model(
+    harmonic = ARIMA(Demand ~ fourier(period = "year", K = 5) +
+                       fourier(period = "week", K = 3) +
+                       fourier(period = "day", K = 3) + PDQ(0,0,0) + pdq(2,0,2))
+  )
+
+report(fit3)
+```
+
+```{r}
+p <- vic_train %>% 
+  autoplot(Demand) +
+  geom_line(aes(y = .fitted), data = fit3 %>% augment(), color = "firebrick")
+
+plotly::ggplotly(p)
+```
+```{r}
+fc3 <- fit3 %>% 
+  forecast(h = "3 months")
+
+fc3 %>% 
+  autoplot(vic_elec %>% filter_index("2014-10-01"~.), level = NULL)
+
+fc3 %>% 
+  autoplot(vic_elec %>% filter_index("2014-10-01"~.))
+
+fc3 %>% 
+  accuracy(vic_elec)
+```
+
+```{r}
+elec <- vic_elec |>
+  mutate(
+    DOW = wday(Date, label = TRUE),
+    Working_Day = !Holiday & !(DOW %in% c("Sat", "Sun")),
+    Cooling = pmax(Temperature, 18)
+  )
+elec |>
+  ggplot(aes(x=Temperature, y=Demand, col=Working_Day)) +
+  geom_point(alpha = 0.6) +
+  labs(x="Temperature (degrees Celsius)", y="Demand (MWh)")
+```
+
+
+```{r}
+fit4 <- vic_train %>% 
+  model(
+    harmonic = ARIMA(Demand ~ Temperature + I(Temperature^2) + fourier(period = "year", K = 5) +
+                       fourier(period = "week", K = 3) +
+                       fourier(period = "day", K = 3) + PDQ(0,0,0) + pdq(2,0,2))
+  )
+
+report(fit4)
+```
+
+
+```{r}
+fc4 <- fit4 %>% 
+  forecast(new_data = vic_elec %>% filter_index("2014-10-01"~.))
+
+fc4 %>% 
+  autoplot(vic_elec %>% filter_index("2014-10-01"~.), level = NULL)
+
+fc4 %>% 
+  autoplot(vic_elec %>% filter_index("2014-10-01"~.))
+
+fc4 %>% 
+  accuracy(vic_elec)
+```

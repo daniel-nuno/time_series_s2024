@@ -1,0 +1,91 @@
+---
+title: 'S&P 500'
+subtitle: 'Clase series de tiempo, primavera 2024'
+author: 'Daniel Nuño, daniel.nuno@iteso.mx'
+date: "Abril 10, 2024"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6, fig.width = 7)
+```
+
+```{=html}
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+```
+<center>![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg){width="20%"}</center>
+
+# Datos
+
+```{r}
+library(tidyquant)
+library(tidyverse)
+library(tsibble)
+library(fable)
+library(feasts)
+```
+
+```{r}
+index = tq_index("SP500") %>% select(symbol, weight)
+index = index %>% filter(symbol != "-")
+index
+sum(index$weight)
+
+data = tq_get(index$symbol, get = "stock.prices", from = "2023-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
+
+```
+
+```{r}
+data = as_tsibble(data, key = symbol, index = date, regular = TRUE)
+#data = fill_gaps(data) %>% fill(adjusted, .direction = "down")
+#data = mutate(data, t = row_number())
+#data = update_tsibble(data, index = t)
+```
+
+## Split de datos
+
+```{r}
+train = data %>% filter(date < "2024-03-03")
+test = data %>% filter(date > "2024-03-04")
+```
+
+# Modelos
+
+## ETS y ARIMA
+
+```{r}
+sp500_arima_ets = train %>% model(arima = ARIMA(adjusted),
+                                  ets = ETS(adjusted))
+```
+
+```{r}
+sp500_arima_ets
+```
+
+```{r}
+ticker = "ABNB"
+sp500_arima_ets %>% filter(symbol == ticker) %>% augment() |>
+  ggplot(aes(x = t)) +
+  geom_line(aes(y = adjusted, colour = "reales")) +
+  geom_line(aes(y = .fitted, colour = "ajustados")) +
+  labs(y = NULL,
+    title = ticker
+  ) +
+  guides(colour = guide_legend(title = NULL))
+```
+
+
