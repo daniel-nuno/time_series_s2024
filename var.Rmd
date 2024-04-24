@@ -87,7 +87,7 @@ fore
 
 ```{r}
 cummulative_sum_nvda = cumsum(fore$.mean[, "NVDA"])
-forecast_nvda = (1+cummulative_sum_nvda)*421
+forecast_nvda = (1+cummulative_sum_nvda)*filter(data, symbol == "NVDA")$adjusted[311]
 ```
 
 ```{r}

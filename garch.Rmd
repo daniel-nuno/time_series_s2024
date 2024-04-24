@@ -1,0 +1,76 @@
+---
+title: 'NNAR'
+subtitle: 'Clase series de tiempo, primavera 2024'
+author: 'Daniel Nuño, daniel.nuno@iteso.mx'
+date: "Abril 24, 2024"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6, fig.width = 7)
+```
+
+```{=html}
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+```
+![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg)
+
+
+```{r}
+library(tidyquant)
+library(tidyverse)
+library(tsibble)
+library(fable)
+library(feasts)
+```
+
+# Data
+```{r}
+data = tq_get(c("AMZN", "DIS"), get = "stock.prices", from = "2023-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
+data
+```
+
+```{r}
+data = data %>% group_by(symbol) %>% mutate(t = row_number(),
+                                            diff = difference(adjusted),
+                                            return = RETURN(adjusted))
+data
+data = as_tsibble(data, key = symbol, index = t)
+```
+
+```{r}
+data %>% autoplot(diff)
+```
+```{r}
+data %>% autoplot(return)
+```
+```{r}
+ggplot(data, aes(x = diff, colour = symbol)) +
+  geom_histogram(alpha = 0.5) +
+  labs(title = "Histograma",
+       x = "Value",
+       y = "Densidad")
+```
+
+
+
+```{r}
+as_tibble(data) %>% group_by(symbol) %>% reframe(skewness(return))
+
+as_tibble(data) %>% group_by(symbol) %>% reframe(shapiro.test(x=return)$p.value)
+```
+
