@@ -74,3 +74,64 @@ as_tibble(data) %>% group_by(symbol) %>% reframe(skewness(return))
 as_tibble(data) %>% group_by(symbol) %>% reframe(shapiro.test(x=return)$p.value)
 ```
 
+```{r}
+data %>% ACF(return) %>% autoplot()
+```
+
+
+```{r}
+data %>% PACF(return) %>% autoplot()
+```
+
+
+```{r}
+library(rugarch)
+```
+
+```{r}
+ticker = "DIS"
+data_garch = data %>% filter(symbol == ticker)
+
+garchSpec <- ugarchspec(
+           variance.model=list(model="sGARCH", garchOrder=c(1,1)),
+           distribution.model="norm")
+garchFit <- ugarchfit(spec=garchSpec, data=na.omit(data_garch$return))
+garchFit
+```
+
+
+```{r}
+
+garchSpec <- ugarchspec(mean.model = list(armaOrder=c(0,0)),
+                        variance.model = list(model="sGARCH", garchOrder=c(1,3)),
+           distribution.model="norm")
+garchFit <- ugarchfit(spec=garchSpec, data=na.omit(data_garch$return))
+garchFit
+```
+
+```{r}
+setfixed(garchSpec) = as.list(coef(garchFit))
+```
+
+```{r}
+sim = ugarchpath(spec = garchSpec, m.sim = 100, n.sim = 20, r.seed = 123)
+sim
+```
+
+```{r}
+plot.zoo(fitted(sim))
+```
+
+```{r}
+last_price = filter(data, symbol == ticker)$adjusted[max(data$t)]
+forecast_price = last_price*apply(fitted(sim), 2, 'cumsum')+last_price
+```
+
+```{r}
+matplot(forecast_price, type = "l", lwd=3)
+```
+
+```{r}
+apply(forecast_price, 1, 'mean')
+```
+
