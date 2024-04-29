@@ -37,33 +37,15 @@ library(fable)
 library(feasts)
 ```
 
-
 ```{r}
-data = tq_get(c("AMZN", "DIS"), get = "stock.prices", from = "2023-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
-data
-```
-```{r}
-data = pivot_wider(data, id_cols = date, names_from = symbol, values_from = adjusted)
-data
-```
-
-
-```{r}
-data = mutate(data, t = row_number())
-data
-```
-```{r}
-data = pivot_longer(data, c("AMZN", "DIS"), names_to = "symbol", values_to = "adjusted")
-data
-```
-
-```{r}
-data = as_tsibble(data, index = t, key = symbol)
+data = tq_get(c("DIS", "AMZN"), get = "stock.prices", from = "2023-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
 data
 ```
 
 ```{r}
 data = data %>% group_by(symbol) %>% mutate(t = row_number())
+data = as_tsibble(data, key = symbol, index = t)
+data
 ```
 
 
@@ -78,6 +60,8 @@ fit = data %>% model(NNETAR(adjusted))
 filter(fit, symbol == "DIS") %>% report()
 report(filter(fit, symbol == "AMZN"))
 ```
+
+
 ```{r}
 accuracy(fit)
 ```

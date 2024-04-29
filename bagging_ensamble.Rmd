@@ -1,5 +1,5 @@
 ---
-title: 'NNAR'
+title: 'Bagging'
 subtitle: 'Clase series de tiempo, primavera 2024'
 author: 'Daniel Nuño, daniel.nuno@iteso.mx'
 date: "Abril 24, 2024"
@@ -103,7 +103,7 @@ arima_forecasts |> filter(symbol=="DIS") %>%
 ```
 
 ```{r}
-bagged <- ets_forecasts |>  group_by(symbol) %>%
+bagged <- arima_forecasts |>  group_by(symbol) %>%
   summarise(bagged_mean = mean(.mean))
 
 data |> filter(symbol=="AMZN") %>%

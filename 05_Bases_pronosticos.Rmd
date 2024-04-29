@@ -1052,7 +1052,8 @@ Los errores porcentuales, al ser un porcentaje, no tienen unidades y son
 utilizados para comparar el desempeño de pronósticos de distintos
 conjuntos de datos. El más utilizado es el MAPE (error absoluto promedio
 porcentual). Si definimos al error porcentual como
-$p_{t}=100 e_{t} / y_{t}$
+
+$$p_{t}=100 e_{t} / y_{t}$$
 
 Mean absolute percentage error: **MAPE**
 $=\operatorname{mean}\left(\left|p_{t}\right|\right)$
