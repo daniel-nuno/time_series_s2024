@@ -54,7 +54,7 @@ data
 ```
 
 ```{r}
-data %>% autoplot(diff)
+data %>% filter(symbol == "DIS") %>% autoplot(adjusted)
 ```
 ```{r}
 data %>% autoplot(return)

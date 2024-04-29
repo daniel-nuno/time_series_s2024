@@ -1,0 +1,122 @@
+---
+title: 'NNAR'
+subtitle: 'Clase series de tiempo, primavera 2024'
+author: 'Daniel Nuño, daniel.nuno@iteso.mx'
+date: "Abril 24, 2024"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6, fig.width = 7)
+```
+
+```{=html}
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+```
+![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg)
+
+
+
+```{r}
+library(tidyquant)
+library(tidyverse)
+library(tsibble)
+library(fable)
+library(feasts)
+```
+
+```{r}
+library(readxl)
+sectores <- read_excel("Proyecto_2/sectores.xlsx")
+```
+
+
+```{r}
+index = left_join(index, select(sectores, c(symbol, Sector)), by = join_by(symbol == symbol))
+```
+
+
+```{r}
+index %>% filter(if_any(everything(), is.na))
+```
+
+
+
+
+```{r}
+symbols_from_data = unique(data$symbol)
+data = pivot_wider(data, id_cols = date, names_from = symbol, values_from = adjusted)
+data = mutate(data, t = row_number())
+data = pivot_longer(data, all_of(symbols_from_data), names_to = "symbol", values_to = "adjusted")
+```
+
+
+
+```{r}
+data = data %>% group_by(symbol) %>% mutate(t = row_number())
+data = as_tsibble(data, index = t, key = symbol)
+data
+```
+```{r}
+data = left_join(data, index, by = join_by(symbol == symbol))
+data
+```
+
+```{r}
+data = as_tsibble(data, index = t, key = symbol)
+```
+
+```{r}
+data = data %>% mutate(portafolio = adjusted*weight*100)
+```
+
+
+```{r}
+fcasts_symbol <- data %>%
+  model(arima = ARIMA(adjusted)) %>%
+  forecast(h = 20)
+```
+
+```{r}
+fcasts_symbol = left_join(fcasts_symbol, select(index, c(symbol,weight, Sector)), by = join_by(symbol == symbol))
+fcasts_symbol = fcasts_symbol %>% mutate(portafolio = .mean*weight*100)
+```
+
+
+
+```{r}
+#fcasts_sector = fcasts_symbol %>% aggregate_key(Sector/symbol, portafolio = sum(portafolio))
+fcasts_sector = fcasts_symbol %>% group_by(Sector) %>% summarise(portafolio = sum(portafolio))
+fcasts_sector
+```
+
+```{r}
+portafolio_fcst = fcasts_sector %>% summarise(portafolio = sum(portafolio))
+portafolio_fcst
+```
+
+
+# groups
+
+```{r}
+data_agg = data %>% aggregate_key(Sector/symbol, portafolio = sum(portafolio))
+```
+
+
+```{r}
+data_agg %>% filter(is_aggregated(symbol)) %>% autoplot(portafolio) + facet_wrap(vars(Sector), scales = "free_y", ncol = 3) + theme(legend.position = "none")
+```
