@@ -1,0 +1,31 @@
+
+if_else(fit_accuracy$ets<fit_accuracy$arima,
+        if_else(fit_accuracy$ets<fit_accuracy$harmonic,
+                if_else(fit_accuracy$ets<fit_accuracy$prophet,
+                        ets,
+                        if_else(fit_accuracy$arima<fit_accuracy$harmonic,
+                                if_else(fit_accuracy$arima<fit_accuracy$prophet,
+                                        arima, 
+                                        if_else(fit_accuracy$harmonic<fit_accuracy$prophet,
+                                                harmonic,
+                                                prophet
+                                        )
+                                ),
+                                harmonic
+                        ),
+                ),
+                if_else(fit_accuracy$harmonic<fit_accuracy$prophet,
+                        harmonic,
+                        prophet
+                )
+        ),
+        if_else(fit_accuracy$arima<fit_accuracy$harmonic,
+                if_else(fit_accuracy$arima<fit_accuracy$prophet,
+                        arima, 
+                        if_else(fit_accuracy$harmonic<fit_accuracy$prophet,
+                                harmonic,
+                                prophet
+                        )
+                ),
+                harmonic
+        ))

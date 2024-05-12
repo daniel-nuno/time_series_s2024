@@ -56,7 +56,7 @@ sectores <- read_excel("Proyecto_2/sectores.xlsx")
 
 
 ```{r}
-index = left_join(index, select(sectores, c(symbol, Sector)), by = join_by(symbol == symbol))
+index = left_join(index, select(Sector, c(Symbol, Sector)), by = join_by(symbol == Symbol))
 ```
 
 
@@ -106,9 +106,7 @@ data
 
 
 ```{r}
-fcasts_symbol <- data %>%
-  model(arima = ARIMA(adjusted)) %>%
-  forecast(h = 20)
+fcasts_symbol <- best_fit %>% forecast(h = 30)
 ```
 
 ```{r}
@@ -145,3 +143,37 @@ data_agg = data %>% aggregate_key(Sector/symbol, portafolio = sum(portafolio))
 ```{r}
 data_agg %>% filter(is_aggregated(symbol)) %>% autoplot(portafolio) + facet_wrap(vars(Sector), scales = "free_y", ncol = 3) + theme(legend.position = "none")
 ```
+
+```{r}
+if_else(ets<arima,
+       if_else(ets<harmonic,
+               if_else(ets<prophet,
+                       ets,
+                       if_else(arima<harmonic,
+                               if_else(arima<prophet,
+                                       arima, 
+                                       if_else(harmonic<prophet,
+                                               harmonic,
+                                               prophet
+                                               )
+                                       ),
+                               harmonic
+                                ),
+                       ),
+               if_else(harmonic<prophet,
+                       harmonic,
+                       prophet
+                       )
+                ),
+        if_else(arima<harmonic,
+               if_else(arima<prophet,
+                       arima, 
+                       if_else(harmonic<prophet,
+                               harmonic,
+                               prophet
+                               )
+                       ),
+               harmonic
+                ))
+```
+

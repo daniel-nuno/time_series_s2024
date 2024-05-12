@@ -1,0 +1,127 @@
+---
+title: 'S&P 500'
+subtitle: 'Clase series de tiempo, primavera 2024'
+author: 'Daniel Nuño, daniel.nuno@iteso.mx'
+date: "Abril 10, 2024"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6, fig.width = 7)
+```
+
+```{=html}
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+```
+<center>![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg){width="20%"}</center>
+
+```{r}
+library(tidyquant)
+library(tidyverse)
+library(tsibble)
+library(fable)
+library(feasts)
+```
+
+```{r}
+sp500 = tq_get("^GSPC", get = "stock.prices", from = "2022-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
+```
+
+```{r}
+returns = data %>% group_by(symbol) %>% tq_transmute(select = adjusted,
+                mutate_fun = periodReturn,
+                period = "daily",
+                col_rename = "return")
+```
+
+```{r}
+sp500_returns = sp500 %>% group_by(symbol) %>% tq_transmute(select = adjusted,
+                mutate_fun = periodReturn,
+                period = "daily",
+                col_rename = "return")
+```
+
+```{r}
+symbols_from_data = unique(data$symbol)
+returns = pivot_wider(returns, id_cols = date, names_from = symbol, values_from = return)
+returns = mutate(returns, t = row_number())
+returns = pivot_longer(returns, all_of(symbols_from_data), names_to = "symbol", values_to = "return")
+returns = mutate(returns, return = return*100)
+```
+
+```{r}
+sp500_returns = pivot_wider(sp500_returns, id_cols = date, names_from = symbol, values_from = return )
+sp500_returns = mutate(sp500_returns, t = row_number(), sp500 = `^GSPC`*100)
+```
+
+```{r}
+returns = left_join(returns, select(sp500_returns, c(t, sp500)), by = join_by(t == t))
+```
+
+```{r}
+returns = as_tsibble(returns, index = t, key = symbol)
+```
+
+```{r}
+symbols_from_data = unique(data$symbol)
+data = pivot_wider(data, id_cols = date, names_from = symbol, values_from = adjusted)
+data = mutate(data, t = row_number())
+data = pivot_longer(data, all_of(symbols_from_data), names_to = "symbol", values_to = "adjusted")
+```
+
+```{r}
+data = as_tsibble(data, index = t, key = symbol)
+```
+
+```{r}
+data_var = data %>% pivot_wider(id_cols = t, names_from = symbol, values_from = adjusted)
+data_var = left_join(data, temp_train, by = join_by(t == t))
+```
+
+```{r}
+train <- pivot_wider(data, id_cols = t, names_from = symbol, values_from = adjusted) %>% filter_index(. ~ 530)
+test <- pivot_wider(data, id_cols = t, names_from = symbol, values_from = adjusted) %>% filter_index(531 ~ .)
+```
+
+```{r}
+fit_var = train %>% model(var = VAR(vars(A,AAL,AAPL,ABBV,ABNB,ABT,ACGL,ACN,ADBE,ADI,ADM,ADP,ADSK,AEE,AEP,AES,AFL,AIG,AIZ,AJG,AKAM,ALB,ALGN,ALL,ALLE,AMAT,AMCR,AMD,AME,AMGN,AMP,AMT,AMZN,ANET,ANSS,AON,AOS,APA,APD,APH,APTV,ARE,ATO,AVB,AVGO,AVY,AWK,AXON,AXP,AZO,BA,BAC,BALL,BAX,BBWI,BBY,BDX,BEN,`BF-B`,BG,BIIB,BIO,BK,BKNG,BKR,BLDR,BLK,BMY,BR,`BRK-B`,BRO,BSX,BWA,BX,BXP,C,CAG,CAH,CARR,CAT,CB,CBOE,CBRE,CCI,CCL,CDNS,CDW,CE,CEG,CF,CFG,CHD,CHRW,CHTR,CI,CINF,CL,CLX,CMA,CMCSA,CME,CMG,CMI,CMS,CNC,CNP,COF,COO,COP,COR,COST,CPAY,CPB,CPRT,CPT,CRL,CRM,CSCO,CSGP,CSX,CTAS,CTLT,CTRA,CTSH,CTVA,CVS,CVX,CZR,D,DAL,DAY,DD,DE,DECK,DFS,DG,DGX,DHI,DHR,DIS,DLR,DLTR,DOC,DOV,DOW,DPZ,DRI,DTE,DUK,DVA,DVN,DXCM,EA,EBAY,ECL,ED,EFX,EG,EIX,EL,ELV,EMN,EMR,ENPH,EOG,EPAM,EQIX,EQR,EQT,ES,ESS,ETN,ETR,ETSY,EVRG,EW,EXC,EXPD,EXPE,EXR,`F`,FANG,FAST,FCX,FDS,FDX,FE,FFIV,FI,FICO,FIS,FITB,FMC,FOX,FOXA,FRT,FSLR,FTNT,FTV,GD,GE,GEHC,GEN,GILD,GIS,GL,GLW,GM,GNRC,GOOG,GOOGL,GPC,GPN,GRMN,GS,GWW,HAL,HAS,HBAN,HCA,HD,HES,HIG,HII,HLT,HOLX,HON,HPE,HPQ,HRL,HSIC,HST,HSY,HUBB,HUM,HWM,IBM,ICE,IDXX,IEX,IFF,ILMN,INCY,INTC,INTU,INVH,IP,IPG,IQV,IR,IRM,ISRG,IT,ITW,IVZ,J,JBHT,JBL,JCI,JKHY,JNJ,JNPR,JPM,K,KDP,KEY,KEYS,KHC,KIM,KLAC,KMB,KMI,KMX,KO,KR,KVUE,L,LDOS,LEN,LH,LHX,LIN,LKQ,LLY,LMT,LNT,LOW,LRCX,LULU,LUV,LVS,LW,LYB,LYV,MA,MAA,MAR,MAS,MCD,MCHP,MCK,MCO,MDLZ,MDT,MET,META,MGM,MHK,MKC,MKTX,MLM,MMC,MMM,MNST,MO,MOH,MOS,MPC,MPWR,MRK,MRNA,MRO,MS,MSCI,MSFT,MSI,MTB,MTCH,MTD,MU,NCLH,NDAQ,NDSN,NEE,NEM,NFLX,NI,NKE,NOC,NOW,NRG,NSC,NTAP,NTRS,NUE,NVDA,NVR,NWS,NWSA,NXPI,O,ODFL,OKE,OMC,ON,ORCL,ORLY,OTIS,OXY,PANW,PARA,PAYC,PAYX,PCAR,PCG,PEG,PEP,PFE,PFG,PG,PGR,PH,PHM,PKG,PLD,PM,PNC,PNR,PNW,PODD,POOL,PPG,PPL,PRU,PSA,PSX,PTC,PWR,PXD,PYPL,QCOM,QRVO,RCL,REG,REGN,RF,RHI,RJF,RL,RMD,ROK,ROL,ROP,ROST,RSG,RTX,RVTY,SBAC,SBUX,SCHW,SHW,SJM,SLB,SMCI,SNA,SNPS,SO,SPG,SPGI,SRE,STE,STLD,STT,STX,STZ,SWK,SWKS,SYF,SYK,SYY,`T`,TAP,TDG,TDY,TECH,TEL,TER,TFC,TFX,TGT,TJX,TMO,TMUS,TPR,TRGP,TRMB,TROW,TRV,TSCO,TSLA,TSN,TT,TTWO,TXN,TXT,TYL,UAL,UBER,UDR,UHS,ULTA,UNH,UNP,UPS,URI,USB,V,VICI,VLO,VLTO,VMC,VRSK,VRSN,VRTX,VTR,VTRS,VZ,WAB,WAT,WBA,WBD,WDC,WEC,WELL,WFC,WM,WMB,WMT,WRB,WRK,WST,WTW,WY,WYNN,XEL,XOM,XYL,YUM,ZBH,ZBRA,ZTS) ~ AR(1)))
+```
+
+```{r}
+fit_var = train %>% model(var = VAR(vars(A, MSFT) ~ AR(1)))
+```
+
+
+```{r}
+filter(fit_var, symbol=="AAPL") %>% report()
+```
+```{r}
+train <- returns %>% filter_index(. ~ 530)
+test <- returns %>% filter_index(531 ~ .)
+```
+
+```{r}
+fit_var = train %>% model(var = VAR(vars(return, sp500) ~ AR(p=1:10), ai = "bic"))
+```
+
+
+```{r}
+fit_var %>% forecast(h = 30) %>% accuracy(test)
+```
+
+
+

@@ -47,7 +47,9 @@ data
 
 ```{r}
 data = tq_get(c("NVDA", "MSFT"), get = "stock.prices", from = "2023-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
+```
 
+```{r}
 returns = data %>% group_by(symbol) %>% tq_transmute(select = adjusted,
                 mutate_fun = periodReturn,
                 period = "daily",
@@ -69,7 +71,7 @@ returns
 ```
 
 ```{r}
-fit_var = returns %>% model(VAR(vars(NVDA, MSFT) ~ AR(10)))
+fit_var = returns %>% model(VAR(vars()))
 report(fit_var)
 ```
 

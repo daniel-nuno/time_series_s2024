@@ -90,14 +90,16 @@ library(rugarch)
 ```
 
 ```{r}
-ticker = "DIS"
-data_garch = data %>% filter(symbol == ticker)
-
-garchSpec <- ugarchspec(
-           variance.model=list(model="sGARCH"),
-           distribution.model="norm")
-garchFit <- ugarchfit(spec=garchSpec, data=na.omit(data_garch$return))
-garchFit
+for (sym in symbols_from_data){
+  ticker = sym
+  data_garch = data %>% filter(symbol == ticker)
+  
+  garchSpec <- ugarchspec(
+             variance.model=list(model="sGARCH"),
+             distribution.model="norm")
+  garchFit <- ugarchfit(spec=garchSpec, data=na.omit(data_garch$return))
+  garchFit
+}
 ```
 
 

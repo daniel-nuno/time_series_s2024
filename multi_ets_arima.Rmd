@@ -48,19 +48,20 @@ sum(index$weight)
 data = tq_get(index$symbol, get = "stock.prices", from = "2023-01-01", to = "2024-03-29") %>% select(symbol, date, adjusted)
 
 ```
-
 ```{r}
-data = as_tsibble(data, key = symbol, index = date, regular = TRUE)
-#data = fill_gaps(data) %>% fill(adjusted, .direction = "down")
-#data = mutate(data, t = row_number())
-#data = update_tsibble(data, index = t)
+symbols_from_data = unique(data$symbol)
+data = pivot_wider(data, id_cols = date, names_from = symbol, values_from = adjusted)
+data = mutate(data, t = row_number())
+data = pivot_longer(data, all_of(symbols_from_data), names_to = "symbol", values_to = "adjusted")
+data = as_tsibble(data, index = t, key = symbol)
+data = data %>% filter(!is.na(adjusted))
 ```
 
 ## Split de datos
 
 ```{r}
-train = data %>% filter(date < "2024-03-03")
-test = data %>% filter(date > "2024-03-04")
+train = data %>% filter_index(. ~ (562-30))
+test = data %>% filter_index((562-30+1) ~ .)
 ```
 
 # Modelos
@@ -68,8 +69,8 @@ test = data %>% filter(date > "2024-03-04")
 ## ETS y ARIMA
 
 ```{r}
-sp500_arima_ets = train %>% model(arima = ARIMA(adjusted),
-                                  ets = ETS(adjusted))
+sp500_arima_ets = train %>% model(arima = ARIMA(log(adjusted)),
+                                  ets = ETS(log(adjusted)))
 ```
 
 ```{r}
@@ -88,4 +89,20 @@ sp500_arima_ets %>% filter(symbol == ticker) %>% augment() |>
   guides(colour = guide_legend(title = NULL))
 ```
 
+
+```{r}
+fit_accuracy <- sp500_arima_ets %>% forecast(h = 30) %>% accuracy(test, measures = lst(MAPE)) %>% 
+  pivot_wider(names_from = .model, values_from = MAPE) %>% 
+  select(-.type)
+fit_accuracy
+```
+
+```{r}
+best_fit <- sp500_arima_ets %>% 
+  transmute(
+    symbol,
+    best_fit = if_else(fit_accuracy$ets < fit_accuracy$arima, ets, arima)
+  )
+best_fit
+```
 

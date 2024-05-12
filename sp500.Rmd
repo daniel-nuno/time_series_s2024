@@ -182,9 +182,7 @@ fit3 <- data_fill_na %>%
   model(
     harmonic = ARIMA(adjusted ~ trend() + fourier(period = "week", K = 2) +
           fourier(period = "year", K = 3))
-
   )
-
 ```
 
 ```{r}

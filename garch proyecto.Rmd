@@ -1,0 +1,82 @@
+---
+title: 'GARCH'
+subtitle: 'Clase series de tiempo, primavera 2024'
+author: 'Daniel Nuño, daniel.nuno@iteso.mx'
+date: "May 7, 2024"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: cosmo
+    highlight: tango
+  github_document:
+    toc: yes
+    dev: jpeg
+  html_document:
+    toc: yes
+    df_print: paged
+---
+
+```{r setup, echo = FALSE}
+knitr::opts_chunk$set(echo= TRUE,
+                      fig.height = 6, fig.width = 7)
+```
+
+```{=html}
+<style>
+.forceBreak { -webkit-column-break-after: always; break-after: column; }
+</style>
+```
+![](https://upload.wikimedia.org/wikipedia/commons/d/db/Logo_ITESO_normal.jpg)
+
+
+```{r}
+library(tidyquant)
+library(tidyverse)
+library(tsibble)
+library(fable)
+library(feasts)
+```
+
+# Data
+```{r}
+#descarga o descarga los datos de las 500 acciones a partir del 1/1/2022
+```
+
+# Transforma
+```{r}
+data = data %>% group_by(symbol) %>% mutate(t = row_number(),
+                                            diff = difference(adjusted),
+                                            return = RETURN(adjusted)*100)
+data = as_tsibble(data, key = symbol, index = t)
+```
+
+```{r}
+train = data %>% filter_index(. ~ (562-30))
+test = data %>% filter_index((562-30+1) ~ .)
+```
+
+```{r}
+library(rugarch)
+```
+
+```{r}
+new_data = tibble()
+for (sym in unique(data$symbol)){
+  ticker = sym
+  data_garch = train %>% filter(symbol == ticker)
+  garchSpec <- ugarchspec(mean.model = list(armaOrder=c(0,0)),
+                        variance.model = list(model="sGARCH"),
+           distribution.model="norm")
+  garchFit <- ugarchfit(spec=garchSpec, data=na.omit(data_garch$return))
+  setfixed(garchSpec) = as.list(coef(garchFit))
+  sim = ugarchpath(spec = garchSpec, m.sim = 10, n.sim = 30)
+  last_price = filter(data, symbol == ticker)$adjusted[max(data$t)]
+  forecast_price = last_price*apply(fitted(sim)/100, 2, 'cumsum')+last_price
+  forecasting = apply(forecast_price, 1, 'mean')
+  new_data = bind_rows(new_data, tibble(t = 1:30, symbol = rep(ticker, 30), adjusted = forecasting))
+}
+```
+
+
+
